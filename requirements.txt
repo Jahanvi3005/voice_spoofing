@@ -1,0 +1,9 @@
+Flask
+numpy
+librosa
+scipy
+tensorflow
+pymongo
+Werkzeug
+gunicorn
+pydub 

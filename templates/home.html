@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}{{ get_text('home_nav') }} - {{ get_text('app_title') }}{% endblock %} {# Changed title to Home Page #}
+
+{% block content %}
+<div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <h1 class="text-4xl font-extrabold text-gray-800 dark:text-white mb-4 text-center p-3 rounded-xl bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700">
+        {{ get_text('home_nav') }} {# Changed heading to Home Page #}
+    </h1>
+    <p class="text-xl text-gray-600 dark:text-gray-300 mb-8 text-center p-3 rounded-lg">
+        {{ get_text('home_tagline') }}
+    </p>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <!-- Left Section: Welcome/Introduction -->
+        <div class="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 border-2 border-gray-200 dark:border-gray-700 flex flex-col justify-center items-center text-center animate-fade-in">
+            <i class="fas fa-bullhorn text-indigo-600 dark:text-indigo-400 text-5xl mb-4"></i>
+            <h2 class="text-3xl font-bold text-gray-800 dark:text-white mb-3">
+                Welcome To VoiceSentinal ! {# Directly updated as requested #}
+            </h2>
+            <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+                {{ get_text('voicesentinel_description_part1') }}
+            </p>
+            {# Removed the paragraph for voicesentinel_description_part2 as requested #}
+        </div>
+
+        <!-- Right Section: About Spoofing Attacks and Unified Input/Output -->
+        <div class="lg:col-span-2 space-y-8">
+            <!-- About Spoofing Attacks (Existing content, modified) -->
+            <div class="bg-white/80 dark:bg-gray-800/80 rounded-xl shadow-xl p-6 border-2 border-gray-200 dark:border-gray-700 animate-fade-in-delay-1">
+                {# Removed the h2 heading for 'rise_of_spoofing_attacks' as requested #}
+                <p class="text-gray-700 dark:text-gray-300 leading-relaxed text-center">
+                    {{ get_text('voicesentinel_description_part2') }} {# Replaced with the requested text #}
+                </p>
+            </div>
+
+            <!-- Unified Input and Output Section (Existing content, updated background) -->
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-700 dark:to-gray-900 rounded-xl shadow-2xl p-8 border-2 border-indigo-200 dark:border-indigo-900 animate-fade-in-delay-2">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Input Audio Section -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-indigo-700 dark:text-indigo-400 mb-4">{{ get_text('input_audio_header') }}</h2>
+                        
+                        <!-- File Upload Area -->
+                        <div id="dropZone" class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300 mb-4">
+                            <p class="text-lg text-gray-700 dark:text-gray-300 mb-2">{{ get_text('drag_drop_prompt') }}</p>
+                            <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">{{ get_text('or_click_browse') }}</p>
+                            <input type="file" id="audioFile" accept="audio/*" class="hidden">
+                            <label for="audioFile" class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg cursor-pointer transition-colors duration-300">
+                                {{ get_text('upload_file_label') }}
+                            </label>
+                            <p id="fileSelectedDisplay" class="text-sm text-gray-600 dark:text-gray-400 mt-2"></p>
+                        </div>
+
+                        <p class="text-center text-gray-500 dark:text-gray-400 my-4">{{ get_text('record_audio_prompt') }}</p>
+
+                        <!-- Audio Recording Controls -->
+                        <div class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
+                            <button id="recordButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 flex-1 w-full sm:w-auto">
+                                <i class="fas fa-microphone mr-2"></i> {{ get_text('start_recording_btn') }}
+                            </button>
+                            <button id="stopButton" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 flex-1 w-full sm:w-auto" disabled>
+                                <i class="fas fa-stop mr-2"></i> {{ get_text('stop_recording_btn') }}
+                            </button>
+                        </div>
+                        <p id="recordingStatus" class="text-center text-gray-700 dark:text-gray-300 mt-2 min-h-[24px]"></p>
+
+                        <!-- Analyze Button -->
+                        <button id="analyzeButton" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg mt-6 transition-colors duration-300 cursor-not-allowed" disabled>
+                            <i class="fas fa-search mr-2"></i> {{ get_text('analyze_audio_btn') }}
+                        </button>
+                    </div>
+
+                    <!-- Detection Results Section -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-indigo-700 dark:text-indigo-400 mb-4">{{ get_text('detection_results_header') }}</h2>
+                        
+                        <div id="loadingIndicator" class="hidden text-center my-4">
+                            <i class="fas fa-spinner fa-spin text-indigo-600 text-3xl"></i>
+                            <p class="text-indigo-600 dark:text-indigo-400 mt-2">{{ get_text('analyzing_audio') }}</p>
+                        </div>
+
+                        <p class="text-center text-2xl font-extrabold p-4 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 mb-4 min-h-[70px] flex items-center justify-center shadow-md" id="verdictOutput">
+                            {{ get_text('no_analysis_yet') }}
+                        </p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center text-gray-700 dark:text-gray-200 mb-4">
+                            <div>
+                                <p class="font-bold text-lg">{{ get_text('genuine') }}:</p>
+                                <span id="confGenuine" class="text-xl font-semibold text-emerald-600 dark:text-emerald-400">N/A</span>
+                            </div>
+                            <div>
+                                <p class="font-bold text-lg">{{ get_text('spoofed') }}:</p>
+                                <span id="confSpoofed" class="text-xl font-semibold text-rose-600 dark:text-rose-400">N/A</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <p class="text-lg font-bold text-gray-800 dark:text-white mb-2">{{ get_text('play_audio') }}</p>
+                            <audio id="audioPlayback" controls class="w-full mt-2 rounded-lg shadow-md"></audio>
+                            
+                            <!-- New: Download Button and Playback Speed -->
+                            <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center mt-4 space-y-3 sm:space-y-0 sm:space-x-4">
+                                <button id="downloadAudioButton" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-center">
+                                    <i class="fas fa-download mr-2"></i> {{ get_text('download_audio') }}
+                                </button>
+                                <div class="flex-1 flex items-center space-x-2">
+                                    <label for="playbackSpeedSelect" class="text-gray-700 dark:text-gray-300 text-sm font-medium whitespace-nowrap">{{ get_text('playback_speed') }}:</label>
+                                    <select id="playbackSpeedSelect" class="flex-1 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-md py-1 px-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <option value="0.5">0.5x</option>
+                                        <option value="0.75">0.75x</option>
+                                        <option value="1.0" selected>1.0x</option>
+                                        <option value="1.25">1.25x</option>
+                                        <option value="1.5">1.5x</option>
+                                        <option value="2.0">2.0x</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button id="clearButton" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg mt-4 transition-colors duration-300">
+                            <i class="fas fa-redo-alt mr-2"></i> {{ get_text('clear_all_btn') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Keyframe for fade-in animation */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-fade-in {
+        animation: fadeIn 0.8s ease-out forwards;
+    }
+    .animate-fade-in-delay-1 {
+        animation: fadeIn 0.8s ease-out forwards;
+        animation-delay: 0.2s; /* Delay for sequential appearance */
+    }
+    .animate-fade-in-delay-2 {
+        animation: fadeIn 0.8s ease-out forwards;
+        animation-delay: 0.4s; /* Further delay */
+    }
+    /* Ensure elements are hidden initially to allow animation */
+    .animate-fade-in, .animate-fade-in-delay-1, .animate-fade-in-delay-2 {
+        opacity: 0;
+    }
+</style>
+{% endblock %}
