@@ -1,9 +1,12 @@
-Flask
-numpy
-librosa
-scipy
-tensorflow
+Flask 
+requests
 pymongo
 Werkzeug
-gunicorn
-pydub 
+numpy
+librosa
+soundfile
+tensorflow # Or tensorflow-cpu if you don't have a GPU
+keras
+ffmpeg
+pydub
+

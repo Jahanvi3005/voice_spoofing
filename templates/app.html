@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceSentinel: AI Voice Spoofing Detection</title>
+    <!-- Favicon link added -->
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome CDN for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* Keyframe animations for dynamic blobs */
+        @keyframes blob-float-one {
+            0%, 100% {
+                transform: translate(0, 0) scale(1);
+                opacity: 0.3; /* Adjusted for visibility */
+            }
+            25% {
+                transform: translate(20%, -15%) scale(1.1);
+                opacity: 0.35; /* Adjusted for visibility */
+            }
+            50% {
+                transform: translate(0, 20%) scale(0.9);
+                opacity: 0.28; /* Adjusted for visibility */
+            }
+            75% {
+                transform: translate(-20%, -10%) scale(1.05);
+                opacity: 0.32; /* Adjusted for visibility */
+            }
+        }
+
+        @keyframes blob-float-two {
+            0%, 100% {
+                transform: translate(0, 0) scale(1);
+                opacity: 0.32; /* Adjusted for visibility */
+            }
+            30% {
+                transform: translate(-15%, 20%) scale(1.08);
+                opacity: 0.3; /* Adjusted for visibility */
+            }
+            60% {
+                transform: translate(10%, -20%) scale(0.95);
+                opacity: 0.34; /* Adjusted for visibility */
+            }
+            90% {
+                transform: translate(-5%, 15%) scale(1.03);
+                opacity: 0.31; /* Adjusted for visibility */
+            }
+        }
+
+        @keyframes blob-float-three {
+            0%, 100% {
+                transform: translate(0, 0) scale(1);
+                opacity: 0.29; /* Adjusted for visibility */
+            }
+            40% {
+                transform: translate(25%, 10%) scale(0.92);
+                opacity: 0.33; /* Adjusted for visibility */
+            }
+            80% {
+                transform: translate(-10%, -25%) scale(1.1);
+                opacity: 0.27; /* Adjusted for visibility */
+            }
+        }
+
+        .shape-blob.one {
+            animation: blob-float-one 25s ease-in-out infinite alternate;
+            top: 10%;
+            left: 5%;
+            width: 300px;
+            height: 300px;
+            background-color: rgba(0, 0, 0, 0.3); /* Changed to black, increased opacity */
+            filter: blur(80px);
+            border-radius: 50%;
+        }
+
+        .shape-blob.two {
+            animation: blob-float-two 30s ease-in-out infinite alternate-reverse;
+            bottom: 15%;
+            right: 10%;
+            width: 400px;
+            height: 400px;
+            background-color: rgba(0, 0, 0, 0.35); /* Changed to black, increased opacity */
+            filter: blur(90px);
+            border-radius: 50%;
+        }
+
+        .shape-blob.three {
+            animation: blob-float-three 23s linear infinite alternate;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 250px;
+            background-color: rgba(0, 0, 0, 0.4); /* Changed to black, increased opacity */
+            filter: blur(70px);
+            border-radius: 50%;
+        }
+
+        /* Ensure parallax container is relative */
+        #home {
+            position: relative;
+            overflow: hidden; /* Hide overflow from blob movement */
+        }
+        .shape-blob {
+            position: absolute;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body class="dark-mode">
+    <!-- Login/Registration Modal Placeholder -->
+    <div id="login-modal-placeholder"></div>
+
+    <!-- Scroll Progress Bar -->
+    <div id="scroll-progress-bar"></div>
+
+    <!-- Top Navbar -->
+    <nav id="main-navbar" class="fixed top-0 left-0 right-0 z-50 bg-black dark:bg-black transition-colors duration-300">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center transition-colors duration-300">
+            <!-- Left side: Logo/Title and Hamburger for Mobile -->
+            <div class="flex items-center space-x-4">
+                
+                <!-- Logo/Title (visible on all screens) -->
+                <a href="#" class="flex items-center space-x-2">
+                    
+                    <span class="text-2xl font-bold text-white transition-colors duration-300">           </span>
+                </a>
+            </div>
+
+            <!-- Center Section: Desktop Nav Links (visible by default, hidden on mobile) -->
+            <div class="flex space-x-8 md:flex "> <!-- Changed to flex by default, hidden on mobile for md+ -->
+                <a href="#home" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">Home</a>
+                <a href="#features" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">Features</a>
+                <a href="#how-it-works" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">How It Works</a>
+                <a href="#about" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">About Us</a>
+                <a href="#faq" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">FAQ</a>
+                <a href="#news" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">Latest News</a>
+                <a href="#contact" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">Contact</a>
+            </div>
+
+            <!-- Right Section: Theme Toggle, Login/Logout -->
+            <div class="flex items-center space-x-4">
+                
+                <!-- Logged In Info / Logout Button (initially hidden, shown by JS if logged in) -->
+                <div id="logged-in-info" class="text-gray-300 flex items-center space-x-2 hidden">
+                    <span id="user-email-display" class="font-medium hidden md:inline"></span>
+                    <button id="logout-btn" class="ml-2 px-3 py-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors duration-300">Logout</button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Navigation (hidden on desktop, toggled by JS on mobile) -->
+        <div id="navbar-links" class="hidden md:hidden flex-col items-center pb-4 space-y-2 bg-black dark:bg-black transition-all duration-300 ease-in-out">
+            <a href="#home" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">Home</a>
+            <a href="#features" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">Features</a>
+            <a href="#how-it-works" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">How It Works</a>
+            <a href="#about" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">About Us</a>
+            <a href="#faq" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">FAQ</a>
+            <a href="#news" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">Latest News</a>
+            <a href="#contact" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">Contact</a>
+        </div>
+    </nav>
+
+
+    <main class="pt-20">
+        <!-- Hero Section -->
+        <section id="home" class="relative bg-black text-white py-24 md:py-40 text-center overflow-hidden">
+            <div class="absolute inset-0 z-0"> <!-- Removed opacity-10 here -->
+                <div class="shape-blob one"></div>
+                <div class="shape-blob two"></div>
+                <div class="shape-blob three"></div>
+            </div>
+            <div class="container mx-auto px-4 relative z-10">
+                <h1 class="text-4xl md:text-6xl font-extrabold leading-tight mb-6 animate-fade-in-up text-white">
+                
+                    VoiceSentinal: Guarding Against <h1 class="text-4xl md:text-6xl font-extrabold leading-tight mb-6 animate-fade-in-up text-blue-400"> AI Voice Spoofing </h1>
+                </h1>
+                <p class="text-lg md:text-xl mb-8 opacity-90 animate-fade-in-up delay-200 text-white">
+                    Harnessing advanced AI to detect and combat sophisticated voice impersonations.
+                </p>
+                <br>
+                <div class="space-x-4 animate-fade-in-up delay-400">
+                    <a href="#voice-analysis" id="open-voice-analysis-btn" class="px-8 py-3 bg-white border border-black text-black rounded-full text-lg font-semibold hover:bg-black hover:text-white hover:border-white transition-colors duration-300">
+                        Analyze Your Voice
+                    </a>
+                    <a href="#features" class="px-8 py-3 border border-white text-white rounded-full text-lg font-semibold hover:bg-white hover:text-black transition-colors duration-300">
+                        Learn More
+                    </a>
+                </div>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <br>
+                <div id="user-id-display" class="mt-4 text-sm text-gray-500 dark:text-gray-400"></div>
+            </div>
+        </section>
+
+        <!-- Voice Analysis Section -->
+        <section id="voice-analysis" class="py-16 md:py-24 bg-black dark:bg-black transition-colors duration-300">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-8">
+                    Analyze Your Voice for Authenticity
+                </h2>
+                <p class="text-lg text-gray-300 mb-10 max-w-2xl mx-auto">
+                    Upload an audio file or record directly to check for potential AI voice spoofing. Our system will analyze the subtle characteristics of the voice.
+                </p>
+
+                <div class="max-w-3xl mx-auto">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <!-- Upload Audio Card -->
+                        <div class="flex flex-col items-center p-6 rounded-lg">
+                            <label for="audio-file-input" class="cursor-pointer text-center w-full">
+                                <i class="fas fa-cloud-upload-alt text-4xl text-blue-400 dark:text-blue-400 mb-3"></i>
+                                <p class="text-gray-200 dark:text-gray-200 font-medium mb-1">Click to Upload Audio</p>
+                                <p class="text-sm text-gray-400 dark:text-gray-400">(MP3, WAV, FLAC - Max 5MB)</p>
+                            </label>
+                            <input type="file" id="audio-file-input" accept="audio/*" class="hidden">
+                            <!-- New container for file status -->
+                            <div id="file-status-container" class="mt-4 hidden w-full">
+                                <p id="file-name-display" class="text-center text-gray-200 dark:text-gray-200 font-semibold truncate"></p>
+                                <button id="clear-file-btn" class="mt-2 px-4 py-2 bg-gray-600 text-white rounded-full hover:bg-gray-700 transition-colors duration-300 text-sm">Clear File</button>
+                            </div>
+                        </div>
+
+                        <!-- Record Audio Card -->
+                        <div class="flex flex-col items-center p-6 rounded-lg">
+                            <i class="fas fa-microphone-alt text-4xl text-red-400 dark:text-red-400 mb-3"></i>
+                            <button id="record-audio-btn" class="w-full py-2 bg-red-600 text-white rounded-full text-lg font-semibold hover:bg-red-500 transition-transform transform hover:scale-105 shadow-md flex items-center justify-center space-x-2">
+                                <i class="fas fa-microphone text-xl"></i>
+                                <span>Start Recording</span>
+                            </button>
+                            <div id="recording-status" class="mt-4 text-center text-gray-400 dark:text-gray-400 hidden w-full">
+                                <span class="text-lg font-bold text-red-500 dark:text-red-400 animate-pulse">Recording... </span>
+                                <span id="recording-timer" class="text-lg font-bold">00:00</span>
+                                <div class="flex justify-center space-x-2 mt-2">
+                                    <button id="stop-recording-btn" class="px-4 py-2 bg-yellow-500 text-white rounded-full hover:bg-yellow-600 transition-colors duration-300 text-sm">Stop</button>
+                                    <button id="play-recording-btn" class="px-4 py-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors duration-300 text-sm hidden">Play</button>
+                                    <button id="clear-recording-btn" class="px-4 py-2 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-colors duration-300 text-sm hidden">Clear</button>
+                                </div>
+                            </div>
+                            <audio id="audio-playback" controls class="w-full mt-4 hidden"></audio>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-center mb-8">
+                        <div class="flex-grow border-t border-gray-700 dark:border-gray-700"></div>
+                        <span class="mx-4 text-gray-300 dark:text-gray-300 font-semibold text-lg">READY TO ANALYZE?</span>
+                        <div class="flex-grow border-t border-gray-700 dark:border-gray-700"></div>
+                    </div>
+
+                    <button id="analyze-voice-btn" class="w-full py-3 bg-blue-400 text-white rounded-full text-lg font-bold hover:bg-blue-500 transition-transform transform hover:scale-105 shadow-lg flex items-center justify-center space-x-3" disabled>
+                        <i class="fas fa-cogs"></i>
+                        <span>Analyze Voice</span>
+                    </button>
+
+                    <!-- Loading Spinner for Analysis -->
+                    <div id="analysis-loading-spinner" class="hidden mt-4 flex items-center justify-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mr-3"></div>
+                        <span class="text-gray-300 dark:text-gray-300">Analyzing...</span>
+                    </div>
+                </div>
+
+                <!-- Analysis Results Section -->
+                <div id="analysis-results" class="mt-12 p-8 rounded-lg hidden transition-colors duration-300">
+                    <h3 class="text-2xl md:text-3xl font-bold text-white mb-6">
+                        Analysis Result
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                        <div>
+                            <p id="result-text" class="text-xl font-semibold mb-4 text-white"></p>
+                            <p id="confidence-score" class="text-lg text-gray-300"></p>
+                            <p id="analysis-message" class="text-md text-gray-400 mt-4"></p>
+                        </div>
+                        <div>
+                            <canvas id="spoofingChart" class="max-w-full h-auto"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- Features Section -->
+        <section id="features" class="py-16 md:py-24 bg-white dark:bg-[#1a1a1a] transition-colors duration-300">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-6">
+                    Powerful Features
+                </h2>
+                <p class="text-lg md:text-xl text-gray-700 dark:text-gray-300 mb-12 max-w-3xl mx-auto">
+                    VoiceSentinal leverages state-of-the-art AI to provide robust voice spoofing detection and analysis.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Feature 1 -->
+                    <div class="feature-card">
+                        <i class="fas fa-shield-alt text-5xl text-blue-600 dark:text-blue-400 mb-6"></i>
+                        <h3 class="text-xl font-semibold mb-3 text-gray-900 dark:text-white">Real-time Detection</h3>
+                        <p class="text-gray-600 dark:text-gray-400">
+                            Detect AI-generated voices with high accuracy, protecting against sophisticated spoofing attempts.
+                        </p>
+                    </div>
+                    <!-- Feature 2 -->
+                    <div class="feature-card">
+                        <i class="fas fa-waveform text-5xl text-purple-600 dark:text-purple-400 mb-6"></i>
+                        <h3 class="text-xl font-semibold mb-3 text-gray-900 dark:text-white">Deep Voice Analysis</h3>
+                        <p class="text-gray-600 dark:text-gray-400">
+                            Examine intricate voice characteristics to identify anomalies indicative of synthetic origin.
+                        </p>
+                    </div>
+                    <!-- Feature 3 -->
+                    <div class="feature-card">
+                        <i class="fas fa-chart-line text-5xl text-green-600 dark:text-green-400 mb-6"></i>
+                        <h3 class="text-xl font-semibold mb-3 text-gray-900 dark:text-white">Intuitive Reports</h3>
+                        <p class="text-gray-600 dark:text-gray-400">
+                            Receive clear, understandable reports and visual data on analysis results.
+                        </p>
+                    </div>
+                    <!-- Feature 4 -->
+                    <div class="feature-card">
+                        <i class="fas fa-headset text-5xl text-indigo-600 dark:text-indigo-400 mb-6"></i>
+                        <h3 class="text-xl font-semibold mb-3 text-gray-900 dark:text-white">User Management</h3>
+                        <p class="text-gray-600 dark:text-gray-400">
+                            Secure user accounts with login/registration and analysis history.
+                        </p>
+                    </div>
+                    <!-- Feature 5 -->
+                    <div class="feature-card">
+                        <i class="fas fa-users-cog text-5xl text-teal-600 dark:text-teal-400 mb-6"></i>
+                        <h3 class="text-xl font-semibold mb-3 text-gray-900 dark:text-white">Responsive Design</h3>
+                        <p class="text-gray-600 dark:text-gray-400">
+                            Access VoiceSentinal seamlessly on any device, from desktop to mobile.
+                        </p>
+                    </div>
+                    <!-- Feature 6 -->
+                    <div class="feature-card">
+                        <i class="fas fa-mobile-alt text-5xl text-orange-600 dark:text-orange-400 mb-6"></i>
+                        <h3 class="text-xl font-semibold mb-3 text-gray-900 dark:text-white">Latest news </h3>
+                        <p class="text-gray-600 dark:text-gray-400">
+                            Stay informed with the latest updates and news on voice spoofing attacks.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section id="how-it-works" class="py-16 md:py-24 bg-black dark:bg-black transition-colors duration-300">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-5xl font-extrabold text-white mb-6">
+                    How VoiceSentinal Works
+                </h2>
+                <p class="text-lg md:text-xl text-gray-300 mb-12 max-w-3xl mx-auto">
+                    Our process is simple, secure, and powered by cutting-edge artificial intelligence.
+                </p>
+
+                <div class="flex flex-col items-center space-y-12">
+                    <!-- Step 1 -->
+                    <div class="w-full md:w-2/3 lg:w-1/2 p-6 flex flex-col items-center text-center">
+                        <div class="icon-circle bg-blue-600 text-white text-3xl font-bold w-16 h-16 flex items-center justify-center rounded-full mb-6">1</div>
+                        <h3 class="text-2xl font-semibold mb-3 text-white">Upload or Record</h3>
+                        <p class="text-gray-300">
+                            Submit an audio file or record your voice directly through the app.
+                        </p>
+                    </div>
+                    <!-- Step 2 -->
+                    <div class="w-full md:w-2/3 lg:w-1/2 p-6 flex flex-col items-center text-center">
+                        <div class="icon-circle bg-purple-600 text-white text-3xl font-bold w-16 h-16 flex items-center justify-center rounded-full mb-6">2</div>
+                        <h3 class="text-2xl font-semibold mb-3 text-white">AI Analysis</h3>
+                        <p class="text-gray-300">
+                            Our advanced AI model processes the audio, analyzing subtle patterns and characteristics.
+                        </p>
+                    </div>
+                    <!-- Step 3 -->
+                    <div class="w-full md:w-2/3 lg:w-1/2 p-6 flex flex-col items-center text-center">
+                        <div class="icon-circle bg-green-600 text-white text-3xl font-bold w-16 h-16 flex items-center justify-center rounded-full mb-6">3</div>
+                        <h3 class="text-2xl font-semibold mb-3 text-white">Instant Results</h3>
+                        <p class="text-gray-300">
+                            Receive an immediate assessment indicating whether the voice is likely human or AI-generated.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Us Section -->
+        <section id="about" class="py-16 md:py-24 bg-white dark:bg-[#1a1a1a] transition-colors duration-300">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-6">
+                    About VoiceSentinal
+                </h2>
+                <p class="text-lg md:text-xl text-gray-700 dark:text-gray-300 mb-12 max-w-3xl mx-auto">
+                    We are a team dedicated to combating the growing threat of AI voice spoofing with innovative technology.
+                </p>
+
+                <div class="max-w-4xl mx-auto text-left space-y-8 text-gray-700 dark:text-gray-300">
+                    <p>
+                        In an era where AI is rapidly advancing, the ability to generate highly realistic synthetic voices poses significant challenges, from deepfake scams to misinformation campaigns. VoiceSentinel was born out of a commitment to provide a robust defense against these emerging threats.
+                    </p>
+                    <p>
+                        Our platform is built on cutting-edge machine learning models, meticulously trained to identify the nuanced differences between authentic human speech and AI-synthesized audio. We aim to empower individuals and organizations with the tools needed to verify voice authenticity and protect against deceptive voice impersonations.
+                    </p>
+                    <p>
+                        We believe in a future where technological progress is balanced with strong security measures. VoiceSentinel is our contribution to making the digital voice landscape safer and more trustworthy.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section id="faq" class="py-16 md:py-24 bg-black dark:bg-black transition-colors duration-300">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-5xl font-extrabold text-white mb-6">
+                    Frequently Asked Questions
+                </h2>
+                <p class="text-lg md:text-xl text-gray-300 mb-12 max-w-3xl mx-auto">
+                    Find answers to common questions about VoiceSentinal and AI voice spoofing.
+                </p>
+
+                <div class="max-w-3xl mx-auto text-left space-y-4">
+                    <!-- FAQ Item 1 -->
+                    <div class="faq-item border-b border-gray-700 dark:border-gray-700 pb-4">
+                        <div class="faq-question flex justify-between items-center cursor-pointer py-2">
+                            <h3 class="text-xl font-semibold text-white">What is AI voice spoofing?</h3>
+                            <i class="fas fa-plus text-white text-lg transition-transform duration-300"></i>
+                        </div>
+                        <div class="faq-answer text-gray-300 pt-2 hidden">
+                            AI voice spoofing refers to the use of artificial intelligence to generate or manipulate audio to impersonate a person's voice, often for malicious purposes like fraud or misinformation.
+                        </div>
+                    </div>
+                    <!-- FAQ Item 2 -->
+                    <div class="faq-item border-b border-gray-700 dark:border-gray-700 pb-4">
+                        <div class="faq-question flex justify-between items-center cursor-pointer py-2">
+                            <h3 class="text-xl font-semibold text-white">How accurate is VoiceSentinal?</h3>
+                            <i class="fas fa-plus text-white text-lg transition-transform duration-300"></i>
+                        </div>
+                        <div class="faq-answer text-gray-300 pt-2 hidden">
+                            VoiceSentinal uses advanced machine learning models trained on diverse datasets to achieve high accuracy in detecting AI-generated voices. However, no system is 100% foolproof, and continuous improvements are made.
+                        </div>
+                    </div>
+                    <!-- FAQ Item 3 -->
+                    <div class="faq-item border-b border-gray-700 dark:border-gray-700 pb-4">
+                        <div class="faq-question flex justify-between items-center cursor-pointer py-2">
+                            <h3 class="text-xl font-semibold text-white">What audio formats are supported?</h3>
+                            <i class="fas fa-plus text-white text-lg transition-transform duration-300"></i>
+                        </div>
+                        <div class="faq-answer text-gray-300 pt-2 hidden">
+                            We support common audio formats such as MP3, WAV, and FLAC. For best results, we recommend using high-quality audio files.
+                        </div>
+                    </div>
+                    <!-- FAQ Item 4 -->
+                    <div class="faq-item border-b border-gray-700 dark:border-gray-700 pb-4">
+                        <div class="faq-question flex justify-between items-center cursor-pointer py-2">
+                            <h3 class="text-xl font-semibold text-white">Is my data secure?</h3>
+                            <i class="fas fa-plus text-white text-lg transition-transform duration-300"></i>
+                        </div>
+                        <div class="faq-answer text-gray-300 pt-2 hidden">
+                            Yes, we prioritize your privacy and data security. All uploaded audio files are processed temporarily and then deleted. Your analysis history is stored securely and associated with your account.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Latest News Section -->
+        <section id="news" class="py-16 md:py-24 bg-white dark:bg-[#1a1a1a] transition-colors duration-300">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-6">
+                    Latest News: Voice Spoofing Attacks
+                </h2>
+                <p class="text-lg md:text-xl text-gray-700 dark:text-gray-300 mb-12 max-w-3xl mx-auto">
+                    Stay informed with the latest developments and news in voice spoofing and cybersecurity.
+                </p>
+
+                <div id="news-articles-container" class="flex flex-col gap-8">
+                    <!-- News articles will be dynamically inserted here by script.js -->
+                    <p class="text-center text-gray-500 dark:text-gray-400">Loading latest news...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contact Section -->
+        <section id="contact" class="py-16 md:py-24 bg-black dark:bg-black transition-colors duration-300 shadow-inner">
+            <div class="container mx-auto px-4 text-center">
+                <h2 class="text-3xl md:text-5xl font-extrabold text-white mb-6">
+                    Get in Touch
+                </h2>
+                <p class="text-lg md:text-xl text-gray-300 mb-12 max-w-3xl mx-auto">
+                    Have questions or want to collaborate? Reach out to us!
+                </p>
+
+                <div class="max-w-4xl mx-auto p-8 rounded-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
+                        <!-- Contact Info Column -->
+                        <div class="text-left">
+                            <h3 class="text-2xl font-bold text-white mb-4">Contact Information</h3>
+                            <p class="text-gray-300 mb-4">
+                                Feel free to reach out to us directly via email and social media.
+                            </p>
+                            <div class="space-y-4 mb-6">
+                                <div class="flex items-center">
+                                    <i class="fas fa-envelope text-blue-400 mr-3 text-xl"></i>
+                                    <span id="contact-email" class="text-gray-300">info@voicesentinal.com</span>
+                                    <button id="copy-email-btn" class="ml-3 px-3 py-1 bg-blue-600 text-white rounded-full text-sm hover:bg-blue-700 transition-colors duration-300">
+                                        <i class="fas fa-copy mr-1"></i> Copy
+                                    </button>
+                                </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-phone-alt text-green-400 mr-3 text-xl"></i>
+                                    <span class="text-gray-300">+91 95413 50110</span>
+                                </div>
+                                <div class="flex items-start">
+                                    <i class="fas fa-map-marker-alt text-purple-400 mr-3 text-xl mt-1"></i>
+                                    <span class="text-gray-300">Amity University Uttar Pradesh, Noida, India</span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-start space-x-6">
+                                <a href="https://linkedin.com" target="_blank" class="social-icon linkedin-icon" aria-label="LinkedIn">
+                                    <i class="fab fa-linkedin-in"></i>
+                                </a>
+                                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" class="social-icon twitter-icon" aria-label="Twitter">
+                                    <i class="fab fa-twitter"></i>
+                                </a>
+                                <a href="https://github.com/a2305223347/AI-Voice-Spoofing-Detection.git" target="_blank" class="social-icon github-icon" aria-label="GitHub">
+                                    <i class="fab fa-github"></i>
+                                </a>
+                                <a href="https://wa.me/919541350110" target="_blank" rel="noopener noreferrer" class="social-icon whatsapp-icon" aria-label="WhatsApp">
+                                    <i class="fab fa-whatsapp"></i>
+                                </a>
+                            </div>
+                        </div>
+
+                        
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Project Authorship Section -->
+        <section id="authorship" class="py-12 bg-white dark:bg-[#1a1a1a] text-center transition-colors duration-300 shadow-inner">
+            <div class="container mx-auto px-4">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Project Authorship</h2>
+                <p class="text-gray-700 dark:text-gray-300 mb-2">
+                    Developed as a major project by:
+                </p>
+                <p class="text-700 dark:text-gray-300 font-semibold mb-2">
+                    [JAHANVI GUPTA , VERTIKA PRASAD], [A2305223347, A2305223362]
+                </p>
+                <p class="text-gray-700 dark:text-gray-300">
+                    Under the guidance of: [DOLLY SHARMA], [Associate Professor]
+                </p>
+                <p class="text-gray-700 dark:text-gray-300">
+                    Department of Computer Science & Engineering/ASET, Amity University Uttar Pradesh
+                </p>
+            </div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                This work is an original contribution and has not been previously submitted for any degree or diploma.
+            </p>
+        </section>
+    </main>
+    <!-- Footer -->
+    <footer class="bg-gray-100 dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-300 py-6 text-center shadow-inner transition-colors duration-300">
+        <div class="container mx-auto px-4">
+            <p>&copy; 2025 VoiceSentinal. All rights reserved. Amity University Uttar Pradesh.</p>
+        </div>
+    </footer>
+
+    <!-- Message Box -->
+    <div id="message-box" class="fixed bottom-4 right-4 text-white px-6 py-3 rounded-lg shadow-lg hidden bg-gray-700 bg-opacity-80 transition-all duration-300">
+        <!-- Message content will be injected here by JavaScript -->
+    </div>
+
+    <!-- Floating Social Media Icons -->
+    <div class="fixed top-1/2 -translate-y-1/2 right-6 flex flex-col space-y-3 z-50">
+        <a href="https://wa.me/919541350110" target="_blank" rel="noopener noreferrer" class="bg-green-500 text-white p-3 rounded-md shadow-lg hover:bg-green-600 transition-colors duration-300" aria-label="WhatsApp">
+            <i class="fab fa-whatsapp text-2xl"></i>
+        </a>
+        <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" class="bg-blue-700 text-white p-3 rounded-md shadow-lg hover:bg-blue-800 transition-colors duration-300" aria-label="LinkedIn">
+            <i class="fab fa-linkedin-in text-2xl"></i>
+        </a>
+        <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" class="bg-blue-400 text-white p-3 rounded-md shadow-lg hover:bg-blue-500 transition-colors duration-300" aria-label="Twitter">
+            <i class="fab fa-twitter text-2xl"></i>
+        </a>
+    </div>
+
+    <!-- News Toggle Button -->
+    <button id="news-toggle-btn" class="fixed bottom-6 right-6 bg-blue-400 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300">
+        <i class="fas fa-newspaper text-2xl"></i>
+    </button>
+
+    <script src="/static/script.js"></script>
+    <!-- Twitter Widgets Script (removed if not needed for news) -->
+</body>
+</html>
