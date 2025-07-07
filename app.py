@@ -4,19 +4,17 @@ import base64
 import numpy as np
 import librosa
 import tensorflow as tf
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, g
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
 from bson.binary import Binary 
 from datetime import datetime
-from pydub import AudioSegment # New import for audio conversion
+from pydub import AudioSegment
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'a_very_secret_key_for_demo_purposes_only')
 
 # --- MongoDB Configuration ---
-# IMPORTANT: For Render deployment, replace 'mongodb://localhost:27017/' with your MongoDB Atlas URI.
-# Example: "mongodb+srv://<username>:<password>@<cluster-url>/voice_spoofing_db?retryWrites=true&w=majority"
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/')
 DB_NAME = 'voice_spoofing_db'
 USERS_COLLECTION_NAME = 'users'
@@ -27,13 +25,12 @@ try:
     db_mongo = mongo_client[DB_NAME]
     users_collection = db_mongo[USERS_COLLECTION_NAME]
     audio_records_collection = db_mongo[AUDIO_RECORDS_COLLECTION_NAME] 
-    print(f"[{os.path.basename(__file__)}] MongoDB connected successfully to '{DB_NAME}' database.")
 except Exception as e:
     print(f"[{os.path.basename(__file__)}] ERROR: MongoDB connection failed: {e}")
     mongo_client = None
     db_mongo = None
-    users_collection = None # Ensure it's None if connection fails
-    audio_records_collection = None # Ensure it's None if connection fails
+    users_collection = None
+    audio_records_collection = None
 
 # --- Configuration for Audio Processing and CNN Model ---
 TARGET_SAMPLE_RATE = 16000
@@ -50,14 +47,11 @@ last_prediction_result = {
     "confidence": {"Genuine": 0.5, "Spoofed": 0.5}
 }
 
-print(f"[{os.path.basename(__file__)}] Initializing Flask app...")
-
 # --- CNN Model Loading ---
 CNN_MODEL = None
 try:
     if not os.path.exists(MODEL_DIR):
         os.makedirs(MODEL_DIR)
-        print(f"[{os.path.basename(__file__)}] Created directory: {MODEL_DIR}")
 
     if os.path.exists(MODEL_PATH):
         CNN_MODEL = tf.keras.models.load_model(MODEL_PATH)
@@ -95,7 +89,7 @@ TRANSLATIONS = {
     'login_title': {'en': 'Login or Register', 'hi': 'लॉगिन या रजिस्टर करें'},
     'login_prompt': {'en': 'Please enter your credentials.', 'hi': 'कृपया अपनी क्रेडेंशियल दर्ज करें।'},
     'username_label': {'en': 'Username:', 'hi': 'यूज़रनेम:'},
-    'password_label': {'en': 'Password:'},
+    'password_label': {'en': 'Password:', 'hi': 'पासवर्ड:'},
     'login_btn': {'en': 'Login', 'hi': 'लॉगिन करें'},
     'register_btn': {'en': 'Register', 'hi': 'रजिस्टर करें'},
     'reg_info': {'en': 'If username does not exist, an account will be created.', 'hi': 'यदि यूज़रनेम मौजूद नहीं है, तो एक खाता बनाया जाएगा।'},
@@ -110,15 +104,15 @@ TRANSLATIONS = {
     'detection_results_header': {'en': 'Detection Results', 'hi': 'जाँच के परिणाम'},
     'overall_verdict': {'en': 'Overall Verdict:', 'hi': 'कुल मिलाकर निर्णय:'},
     'confidence_scores': {'en': 'Confidence Scores:', 'hi': 'विश्वसनीयता स्कोर:'},
-    'genuine': {'en': 'Genuine', 'hi': 'वास्तविक'}, # Changed to just the word for flexible use
-    'spoofed': {'en': 'Spoofed', 'hi': 'स्पूफ़ेड'},   # Changed to just the word for flexible use
+    'genuine': {'en': 'Genuine', 'hi': 'वास्तविक'}, 
+    'spoofed': {'en': 'Spoofed', 'hi': 'स्पूफ़ेड'},   
     'play_audio': {'en': 'Play Submitted Audio:', 'hi': 'सबमिट किया गया ऑडियो चलाएं:'},
     'clear_all_btn': {'en': 'Clear All', 'hi': 'सभी साफ करें'},
     'no_analysis_yet': {'en': 'No analysis yet.', 'hi': 'अभी तक कोई विश्लेषण नहीं हुआ है।'},
     'analyzing_audio': {'en': 'Analyzing audio...', 'hi': 'ऑडियो का विश्लेषण हो रहा है...'},
     'no_audio_provided': {'en': 'Please provide audio first (upload or record).', 'hi': 'पहले ऑडियो प्रदान करें (अपलोड करें या रिकॉर्ड करें)।'},
     'network_error': {'en': 'Network Error', 'hi': 'नेटवर्क त्रुटि'},
-    'analysis_summary': {'en': 'Quick Summary:', 'hi': 'त्वरित सारांश:'},
+    'analysis_summary': {'en': 'Quick Summary:', 'hi': 'त्वरित सारांश:'}, 
     'view_full_history': {'en': 'View Full Analysis History', 'hi': 'पूरा विश्लेषण इतिहास देखें'},
     'thank_you_title': {'en': 'Analysis Complete! Thank You!', 'hi': 'विश्लेषण पूर्ण! धन्यवाद!'},
     'thank_you_message': {'en': 'Your audio has been successfully analyzed.', 'hi': 'आपके ऑडियो का सफलतापूर्वक विश्लेषण किया गया है।'},
@@ -176,20 +170,19 @@ TRANSLATIONS = {
     'forget_password': {'en': 'Forgot Password?', 'hi': 'पासवर्ड भूल गए?'},
     'dont_have_account': {'en': 'Don\'t have an account?', 'hi': 'खाता नहीं है?'},
     'already_have_account': {'en': 'Already have an account?', 'hi': 'पहले से ही खाता है?'},
-    'download_audio': {'en': 'Download Audio', 'hi': 'ऑडियो डाउनलोड करें'}, # Added new translation
-    'playback_speed': {'en': 'Playback Speed', 'hi': 'प्लेबैक गति'}, # Added new translation
+    'download_audio': {'en': 'Download Audio', 'hi': 'ऑडियो डाउनलोड करें'}, 
+    'playback_speed': {'en': 'Playback Speed', 'hi': 'प्लेबैक गति'}, 
     'welcome_to_voicesentinel': {'en': 'Welcome to VoiceSentinel!', 'hi': 'वॉयससेंटिनल में आपका स्वागत है!'}, 
     'voicesentinel_description_part1': {'en': 'Your ultimate solution for detecting voice spoofing. In an era where digital voices are becoming indistinguishable from real ones, securing your verbal interactions is paramount. Our advanced system uses cutting-edge machine learning to identify synthetic or manipulated voices, ensuring your peace of mind in a world of evolving threats.', 'hi': 'वॉयस स्पूफिंग का पता लगाने के लिए आपका अंतिम समाधान। ऐसे युग में जहां डिजिटल आवाजें वास्तविक लोगों से अप्रभेद्य होती जा रही हैं, आपके मौखिक इंटरैक्शन को सुरक्षित करना सर्वोपरि है। हमारी उन्नत प्रणाली सिंथेटिक या हेरफेर की गई आवाजों की पहचान करने के लिए अत्याधुनिक मशीन लर्निंग का उपयोग करती है, जो विकसित होती खतरों की दुनिया में आपकी मन की शांति सुनिश्चित करती है।'}, 
     'voicesentinel_description_part2': {'en': 'Simply upload an audio file or use your microphone to get an instant analysis. Protect your privacy and security with confidence.', 'hi': 'तत्काल विश्लेषण प्राप्त करने के लिए बस एक ऑडियो फ़ाइल अपलोड करें या अपने माइक्रोफ़ोन का उपयोग करें। आत्मविश्वास के साथ अपनी गोपनीयता और सुरक्षा को सुरक्षित रखें।'}, 
     'rise_of_spoofing_attacks': {'en': 'The Rise of Voice Spoofing Attacks', 'hi': 'वॉयस स्पूफिंग हमलों का उदय'},
-    # Condensed description to two sentences:
     'rise_of_spoofing_attacks_description': {
-        'en': 'Voice spoofing is a growing concern where artificial voices bypass security. Our system analyzes audio to distinguish between genuine and spoofed voices, providing a robust defense.',
-        'hi': 'वॉयस स्पूफिंग एक बढ़ती चिंता है जहां कृत्रिम आवाजें सुरक्षा को दरकिनार करती हैं। हमारा सिस्टम वास्तविक और स्पूफ़ेड आवाजों के बीच अंतर करने के लिए ऑडियो का विश्लेषण करता है, जिससे एक मजबूत रक्षा मिलती है।'
+        'en': 'Simply upload an audio file or use your microphone to get an instant analysis. Protect your privacy and security with confidence.',
+        'hi': 'तत्काल विश्लेषण प्राप्त करने के लिए बस एक ऑडियो फ़ाइल अपलोड करें या अपने माइक्रोफ़ोन का उपयोग करें। आत्मविश्वास के साथ अपनी गोपनीयता और सुरक्षा को सुरक्षित रखें.'
     },
-    'not_audio_file': {'en': 'Please drop an audio file.', 'hi': 'कृपया एक ऑडियो फ़ाइल गिराएँ।'}, 
-    'not_audio_file_uploaded': {'en': 'Please upload an audio file.', 'hi': 'कृपया एक ऑडियो फ़ाइल अपलोड करें।'}, 
-    'no_audio_to_download': {'en': 'No audio to download.', 'hi': 'डाउनलोड करने के लिए कोई ऑडियो नहीं है।'}, 
+    'not_audio_file': {'en': 'Please drop an audio file.', 'hi': 'कृपया एक ऑडियो फ़ाइल गिराएँ।'},
+    'not_audio_file_uploaded': {'en': 'Please upload an audio file.', 'hi': 'कृपया एक ऑडियो फ़ाइल अपलोड करें।'},
+    'no_audio_to_download': {'en': 'No audio to download.', 'hi': 'डाउनलोड करने के लिए कोई ऑडियो नहीं है।'},
 }
 
 def get_translated_text(key):
@@ -199,8 +192,12 @@ def get_translated_text(key):
 
 @app.context_processor
 def inject_translations():
-    """Injects translation function and current language into all templates."""
-    return dict(get_text=get_translated_text, current_language=session.get('preferred_language', 'en'))
+    """Injects translation function and current language, and current year into all templates."""
+    return dict(
+        get_text=get_translated_text,
+        current_language=session.get('preferred_language', 'en'),
+        current_year=datetime.now().year # Inject current year
+    )
 
 
 # --- Audio Preprocessing Function ---
@@ -209,7 +206,6 @@ def preprocess_audio(audio_data, original_sr):
         audio_data = librosa.resample(y=audio_data, orig_sr=original_sr, target_sr=TARGET_SAMPLE_RATE)
         original_sr = TARGET_SAMPLE_RATE
     if audio_data.size == 0:
-        print(f"[{os.path.basename(__file__)}] Warning: Empty audio data after resampling.")
         return None
     mfccs = librosa.feature.mfcc(y=audio_data, sr=original_sr, n_mfcc=N_MFCC)
     if mfccs.shape[1] < TARGET_MFCC_FRAMES:
@@ -245,10 +241,10 @@ def predict_with_cnn(features):
         
         # Determine verdict based on probabilities and then get localized text
         if probs[0] > probs[1]:
-            verdict_en = "✅ Genuine" # Store English verdict for consistent frontend logic
+            verdict_en = "✅ Genuine"
             verdict_current_lang = f"✅ {get_translated_text('genuine')}"
         else:
-            verdict_en = "🔴 Spoofed Voice Detected!" # Store English verdict
+            verdict_en = "🔴 Spoofed Voice Detected!"
             verdict_current_lang = f"🔴 {get_translated_text('spoofed')}"
             
         confidence_breakdown = {"Genuine": float(probs[0]), "Spoofed": float(probs[1])}
@@ -260,10 +256,10 @@ def predict_with_cnn(features):
         
         # Determine verdict based on probabilities and then get localized text
         if prob_genuine > prob_spoofed:
-            verdict_en = "✅ Genuine" # Store English verdict for consistent frontend logic
+            verdict_en = "✅ Genuine"
             verdict_current_lang = f"✅ {get_translated_text('genuine')}" 
         else:
-            verdict_en = "🔴 Spoofed Voice Detected!" # Store English verdict
+            verdict_en = "🔴 Spoofed Voice Detected!"
             verdict_current_lang = f"🔴 {get_translated_text('spoofed')}" 
 
         confidence_breakdown = {"Genuine": float(prob_genuine), "Spoofed": float(prob_spoofed)}
@@ -276,38 +272,32 @@ def predict_with_cnn(features):
 def check_login_and_load_user_data():
     # Set default language if not in session (e.g., first visit, or after logout)
     if 'preferred_language' not in session:
-        session['preferred_language'] = 'en' # Default to English
+        session['preferred_language'] = 'en'
 
     # Allow access to static files, login page, and login submission without authentication
     if request.path.startswith('/static/') or request.path == '/login' or request.path == '/login_submit':
         return 
     
     if 'user_id' not in session:
-        print(f"[{os.path.basename(__file__)}] No user_id in session. Redirecting to login.")
-        flash(get_translated_text('please_login_access_dashboard'), 'error') # Translated flash message
+        flash(get_translated_text('please_login_access_dashboard'), 'error')
         return redirect(url_for('login'))
     
-    # FIX: Use 'is not None' for PyMongo collection objects
     if users_collection is not None:
         user_doc = users_collection.find_one({'username': session['user_id']})
         if user_doc:
             session['preferred_mode'] = user_doc.get('preferred_mode', 'light') 
-            session['preferred_language'] = user_doc.get('preferred_language', 'en') # Load preferred language
+            session['preferred_language'] = user_doc.get('preferred_language', 'en')
         else:
-            # If user_id exists in session but not in DB, clear session
             session.pop('user_id', None)
             session.pop('preferred_mode', None)
             session.pop('preferred_language', None)
-            flash(get_translated_text('invalid_session_login_again'), 'error') # Translated flash message
+            flash(get_translated_text('invalid_session_login_again'), 'error')
             return redirect(url_for('login'))
-    else: # If users_collection is None, it means DB connection failed at startup
+    else:
         print(f"[{os.path.basename(__file__)}] WARNING: users_collection is None. Database not available for session check.")
         flash(get_translated_text('database_not_available'), 'error')
-        # You might want to redirect to a special error page or login with a clearer message here
         return redirect(url_for('login'))
 
-
-    print(f"[{os.path.basename(__file__)}] User '{session.get('user_id')}' logged in. Preferred mode: {session.get('preferred_mode')}. Language: {session.get('preferred_language')}. Proceeding.")
 
 @app.route('/')
 def root_redirect():
@@ -317,7 +307,6 @@ def root_redirect():
 @app.route('/home')
 def home():
     """Renders the home page with audio input."""
-    print(f"[{os.path.basename(__file__)}] Accessing home route.")
     try:
         return render_template('home.html', last_prediction=last_prediction_result,
                                user_name=session.get('user_id'), preferred_mode=session.get('preferred_mode'))
@@ -328,20 +317,15 @@ def home():
 @app.route('/results')
 def results():
     """Renders the results page."""
-    print(f"[{os.path.basename(__file__)}] Accessing results route.")
     try:
         user_audio_records = []
-        # FIX: Use 'is not None' for PyMongo collection objects
         if audio_records_collection is not None and 'user_id' in session:
-            # Sort by timestamp descending to show most recent first
             user_audio_records = list(audio_records_collection.find({'user_id': session['user_id']}).sort('timestamp', -1))
-            # Format datetime objects for display if necessary
             for record in user_audio_records:
                 if 'timestamp' in record and isinstance(record['timestamp'], datetime):
                     record['formatted_timestamp'] = record['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
                 else:
                     record['formatted_timestamp'] = 'N/A'
-                # Convert Binary audio data to base64 for embedding in HTML audio tag
                 if 'audio_data' in record and isinstance(record['audio_data'], Binary):
                     record['audio_data_b64'] = base64.b64encode(record['audio_data']).decode('utf-8')
                     record['audio_data_url'] = f"data:{record.get('audio_mimetype', 'audio/wav')};base64,{record['audio_data_b64']}"
@@ -358,13 +342,11 @@ def results():
 @app.route('/account', methods=['GET'])
 def account():
     """Renders the account page."""
-    print(f"[{os.path.basename(__file__)}] Accessing account route.")
     if 'user_id' not in session:
         flash(get_translated_text('please_login_view_account'), 'error') 
         return redirect(url_for('login'))
     
     user_data = None
-    # FIX: Use 'is not None' for PyMongo collection objects
     if users_collection is not None:
         user_data = users_collection.find_one({'username': session['user_id']})
     
@@ -374,13 +356,10 @@ def account():
 @app.route('/update_preferences', methods=['POST'])
 def update_preferences():
     """Updates user preferences (preferred_mode and preferred_language) in the database."""
-    print(f"[{os.path.basename(__file__)}] Accessing update_preferences route.")
     if 'user_id' not in session:
-        print(f"[{os.path.basename(__file__)}] User not logged in for preference update.")
         return jsonify({"success": False, "message": "Not logged in."}), 401
     
     if users_collection is None:
-        print(f"[{os.path.basename(__file__)}] Database not available for preference update.")
         return jsonify({"success": False, "message": get_translated_text('database_not_available')}), 500
 
     user_id = session['user_id']
@@ -393,41 +372,32 @@ def update_preferences():
         if new_mode in ['light', 'dark']:
             update_fields['preferred_mode'] = new_mode
             session['preferred_mode'] = new_mode 
-            print(f"[{os.path.basename(__file__)}] User '{user_id}' updated preferred_mode to '{new_mode}'.")
         else:
-            print(f"[{os.path.basename(__file__)}] Invalid mode received: {new_mode}")
             return jsonify({"success": False, "message": "Invalid mode."}), 400
 
     # Handle preferred_language update
     if 'preferred_language' in data:
         new_language = data.get('preferred_language')
-        if new_language in ['en', 'hi']: # Validate supported languages
+        if new_language in ['en', 'hi']:
             update_fields['preferred_language'] = new_language
-            session['preferred_language'] = new_language # Update session immediately
-            print(f"[{os.path.basename(__file__)}] User '{user_id}' updated preferred_language to '{new_language}'.")
+            session['preferred_language'] = new_language
         else:
-            print(f"[{os.path.basename(__file__)}] Invalid language received: {new_language}")
             return jsonify({"success": False, "message": "Invalid language."}), 400
 
     if not update_fields:
-        print(f"[{os.path.basename(__file__)}] No preferences provided in request body.")
         return jsonify({"success": False, "message": "No preferences provided to update."}), 400
 
     try:
         users_collection.update_one({'username': user_id}, {'$set': update_fields})
-        print(f"[{os.path.basename(__file__)}] Preferences saved to DB for '{user_id}': {update_fields}")
         return jsonify({"success": True, "message": "Preferences updated."})
     except Exception as e:
         print(f"[{os.path.basename(__file__)}] ERROR updating preferences for '{user_id}': {e}")
         return jsonify({"success": False, "message": f"Failed to update preferences: {e}"}), 500
 
-# Removed the separate /update_language_preference route as it's merged into /update_preferences
-
 
 @app.route('/login', methods=['GET']) 
 def login():
     """Renders the login/registration page."""
-    print(f"[{os.path.basename(__file__)}] Accessing login GET route.")
     try:
         return render_template('login.html')
     except Exception as e:
@@ -438,12 +408,10 @@ def login():
 @app.route('/login_submit', methods=['POST'])
 def login_submit():
     """Handles login form submission."""
-    print(f"[{os.path.basename(__file__)}] Accessing login POST route.")
     username = request.form.get('username')
     password = request.form.get('password')
     action = request.form.get('action') 
 
-    # FIX: Use 'is None' for PyMongo collection objects
     if users_collection is None:
         print(f"[{os.path.basename(__file__)}] ERROR: MongoDB connection not established or users_collection is None.")
         flash(get_translated_text('database_not_available'), 'error') 
@@ -459,7 +427,6 @@ def login_submit():
         if action == 'register':
             if user_doc:
                 flash(get_translated_text('username_exists'), 'error') 
-                print(f"[{os.path.basename(__file__)}] Registration failed: Username '{username}' already exists.")
                 return redirect(url_for('login'))
             else:
                 hashed_password = generate_password_hash(password)
@@ -467,15 +434,14 @@ def login_submit():
                     'username': username, 
                     'password_hash': hashed_password,
                     'preferred_mode': 'light', 
-                    'preferred_language': 'en', # Default language for new users
+                    'preferred_language': 'en',
                     'created_at': datetime.now(),
                     'last_login': datetime.now()
                 })
                 session['user_id'] = username
                 session['preferred_mode'] = 'light' 
-                session['preferred_language'] = 'en' # Set session language for new user
+                session['preferred_language'] = 'en'
                 flash(get_translated_text('account_created_logged_in').format(username=username), 'success')
-                print(f"[{os.path.basename(__file__)}] Registered and logged in new user: {username}.")
                 return redirect(url_for('home'))
         
         elif action == 'login':
@@ -484,22 +450,18 @@ def login_submit():
                 if check_password_hash(stored_hash, password):
                     session['user_id'] = username
                     session['preferred_mode'] = user_doc.get('preferred_mode', 'light') 
-                    session['preferred_language'] = user_doc.get('preferred_language', 'en') # Load language
+                    session['preferred_language'] = user_doc.get('preferred_language', 'en')
                     users_collection.update_one({'username': username}, {'$set': {'last_login': datetime.now()}})
                     flash(get_translated_text('welcome_back').format(username=username), 'success')
-                    print(f"[{os.path.basename(__file__)}] Successful login for user: {username}.")
                     return redirect(url_for('home'))
                 else:
                     flash(get_translated_text('invalid_username_password'), 'error')
-                    print(f"[{os.path.basename(__file__)}] Failed login for user {username}: Invalid password.")
                     return redirect(url_for('login'))
             else:
                 flash(get_translated_text('username_not_found'), 'error')
-                print(f"[{os.path.basename(__file__)}] Login failed: Username '{username}' not found.")
                 return redirect(url_for('login'))
         else:
             flash(get_translated_text('invalid_action'), 'error')
-            print(f"[{os.path.basename(__file__)}] Login submission failed: Invalid action '{action}'.")
             return redirect(url_for('login'))
 
     except Exception as e:
@@ -511,17 +473,15 @@ def login_submit():
 @app.route('/logout', methods=['POST'])
 def logout():
     """Handles logout and clears session."""
-    print(f"[{os.path.basename(__file__)}] User logging out.")
     session.pop('user_id', None)
     session.pop('preferred_mode', None)
-    session.pop('preferred_language', None) # Clear language from session
+    session.pop('preferred_language', None)
     flash(get_translated_text('logged_out_successfully'), 'info') 
     return redirect(url_for('login'))
 
 @app.route('/predict', methods=['POST'])
 def predict():
     """Handles audio prediction requests."""
-    print(f"[{os.path.basename(__file__)}] Accessing predict route.")
     global last_prediction_result 
 
     user_id = session.get('user_id')
@@ -529,7 +489,6 @@ def predict():
         return jsonify({"error": get_translated_text('user_not_authenticated')}), 401
 
     if 'audio' not in request.files:
-        print(f"[{os.path.basename(__file__)}] Predict error: No audio file provided.")
         return jsonify({"error": get_translated_text('no_audio_file_provided')}), 400
 
     audio_file_stream = request.files['audio']
@@ -537,23 +496,15 @@ def predict():
     audio_bytes = audio_file_stream.read()
     audio_file_stream.seek(0) 
 
-    print(f"[{os.path.basename(__file__)}] Received audio file: name='{audio_file_stream.filename}', mimetype='{audio_file_stream.mimetype}', content_length={len(audio_bytes)} bytes.")
-
     try:
-        # Check if the audio is webm and convert to wav in-memory using pydub
         if audio_file_stream.mimetype == 'audio/webm' or audio_file_stream.mimetype == 'audio/webm;codecs=opus':
-            print(f"[{os.path.basename(__file__)}] Converting webm audio to wav using pydub...")
             audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes), format="webm")
-            # Export to WAV in a new BytesIO object
             wav_io = io.BytesIO()
             audio_segment.export(wav_io, format="wav")
             wav_io.seek(0)
             audio_bytes_processed = wav_io.read()
-            audio_mimetype_for_librosa = 'audio/wav'
-            print(f"[{os.path.basename(__file__)}] WebM to WAV conversion complete.")
         else:
             audio_bytes_processed = audio_bytes
-            audio_mimetype_for_librosa = audio_file_stream.mimetype
 
         audio_data, original_sr = librosa.load(io.BytesIO(audio_bytes_processed), sr=None, mono=True)
         
@@ -569,32 +520,27 @@ def predict():
 
         verdict_current_lang, verdict_en, confidence_breakdown = predict_with_cnn(processed_features)
 
-        # Update the global result for results.html and thank_you.html
         last_prediction_result['verdict'] = verdict_current_lang
         last_prediction_result['confidence'] = confidence_breakdown
-        print(f"[{os.path.basename(__file__)}] Prediction successful: {verdict_current_lang}")
 
-        # Store Audio Record in MongoDB
-        # FIX: Use 'is not None' for PyMongo collection objects
         if audio_records_collection is not None:
             audio_record = {
                 'user_id': user_id,
                 'timestamp': datetime.now(),
-                'audio_data': Binary(audio_bytes), # Store raw binary audio (original webm)
+                'audio_data': Binary(audio_bytes), 
                 'audio_filename': audio_file_stream.filename, 
-                'audio_mimetype': audio_file_stream.mimetype, # Store original mimetype
-                'verdict_en': verdict_en, # Store English verdict for consistent retrieval if needed
-                'verdict_current_lang': verdict_current_lang, # Store localized verdict
+                'audio_mimetype': audio_file_stream.mimetype, 
+                'verdict_en': verdict_en, 
+                'verdict_current_lang': verdict_current_lang, 
                 'confidence': confidence_breakdown
             }
             audio_records_collection.insert_one(audio_record)
-            print(f"[{os.path.basename(__file__)}] Audio record saved to MongoDB for user '{user_id}'.")
         else:
             print(f"[{os.path.basename(__file__)}] WARNING: Audio record not saved. MongoDB audio_records_collection not available.")
 
         return jsonify({
             "verdict": verdict_current_lang,
-            "verdict_en": verdict_en, # Include English verdict for frontend logic
+            "verdict_en": verdict_en,
             "confidence": confidence_breakdown,
             "redirect_to": url_for('thank_you') 
         })
@@ -605,7 +551,6 @@ def predict():
 @app.route('/thank_you')
 def thank_you():
     """Renders the thank you page after a prediction."""
-    print(f"[{os.path.basename(__file__)}] Accessing thank_you route.")
     try:
         return render_template('thank_you.html', last_prediction=last_prediction_result,
                                user_name=session.get('user_id'), preferred_mode=session.get('preferred_mode'))
@@ -615,9 +560,7 @@ def thank_you():
 
 
 if __name__ == '__main__':
-    print(f"[{os.path.basename(__file__)}] Starting Flask development server...")
     if not os.path.exists(MODEL_DIR):
         os.makedirs(MODEL_DIR)
-        print(f"[{os.path.basename(__file__)}] Created directory: {MODEL_DIR}")
     
     app.run(debug=True, port=5001)

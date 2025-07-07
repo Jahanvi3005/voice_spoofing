@@ -1,181 +1,49 @@
 <!DOCTYPE html>
-<html lang="{{ current_language }}" class="{{ 'dark' if preferred_mode == 'dark' else '' }}">
+<html lang="{{ current_language }}" class="{% if preferred_mode == 'dark' %}dark{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Home Page{% endblock %}</title> {# Changed default title to Home Page #}
+    <title>{{ get_text('app_title') }}</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome for icons -->
+    <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Custom CSS for transitions and sidebar (if needed) -->
     <style>
-        /* Inter Font from Google Fonts */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-        
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+            color: #1f2937; /* Dark gray text */
             transition: background-color 0.3s ease, color 0.3s ease;
-            color: #1a202c;
-            background-color: #ffffff;
-            overflow-x: hidden; /* Prevent horizontal scroll */
         }
-
+        /* Dark mode styles applied when the 'dark' class is on the <html> element */
         html.dark body {
-            background-color: #1a202c;
-            color: #e2e8f0;
-        }
-
-        /* Dark mode specific Tailwind overrides */
-        html.dark .bg-white { 
-            background-color: #2d3748; 
-            color: #e2e8f0;
-        }
-        html.dark .text-gray-800 { 
-            color: #e2e8f0;
-        }
-        html.dark .text-gray-600, html.dark .text-gray-500 { 
-            color: #a0aec0;
-        }
-        html.dark .border-gray-200 { 
-            border-color: #4a5568;
-        }
-        html.dark .hover\:bg-gray-50:hover { 
-            background-color: #4a5568;
-        }
-        html.dark .text-blue-700 { 
-            color: #818cf8; 
-        }
-        html.dark .bg-indigo-50 { 
-            background-color: #312e81; 
-        }
-        html.dark .bg-indigo-600 { 
-            background-color: #4338ca; 
-        }
-        html.dark .hover\:bg-indigo-700:hover { 
-            background-color: #3730a3; 
-        }
-        html.dark .text-emerald-700 { 
-            color: #6ee7b7; 
-        }
-        html.dark .bg-emerald-100 { 
-            background-color: #064e3b; 
-        }
-        html.dark .text-rose-700 { 
-            color: #fda4af; 
-        }
-        html.dark .bg-rose-100 { 
-            background-color: #881337; 
-        }
-        html.dark .text-indigo-700 { 
-            color: #a78bfa; 
-        }
-
-        /* Sidebar Specific Styles */
-        .sidebar {
-            width: 250px; /* Default width */
-            background-color: #ffffff; /* White in light mode */
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            padding-top: 1rem;
-            z-index: 100; /* Above content */
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease-in-out, background-color 0.3s ease;
-            transform: translateX(0); /* Always visible on larger screens by default */
-        }
-
-        html.dark .sidebar {
-            background-color: #374151; /* Light grey (gray-700) in dark mode */
-        }
-
-        .sidebar a {
-            color: #1a202c; /* Dark text for light mode sidebar */
-            transition: background-color 0.2s ease, color 0.3s ease;
-        }
-        html.dark .sidebar a {
-            color: #e2e8f0; /* Light text for dark mode sidebar */
-        }
-        .sidebar a:hover {
-            background-color: rgba(0, 0, 0, 0.05); /* Slight hover for light mode */
-        }
-        html.dark .sidebar a:hover {
-            background-color: rgba(255, 255, 255, 0.1); /* Slight hover for dark mode */
-        }
-        .sidebar .router-link-active {
-            font-weight: bold;
-            background-color: rgba(0, 0, 0, 0.1); /* Active link background for light mode */
-        }
-        html.dark .sidebar .router-link-active {
-            background-color: rgba(255, 255, 255, 0.2); /* Active link background for dark mode */
-        }
-
-        /* Main Content Area */
-        .main-content-area {
-            margin-left: 250px; /* Space for the sidebar */
-            padding-top: 1rem; /* Padding for content below the top of the viewport */
-            transition: margin-left 0.3s ease-in-out;
-        }
-
-        /* Hamburger Icon (visible only on small screens) */
-        .hamburger-menu {
-            position: fixed;
-            top: 1rem;
-            left: 1rem;
-            z-index: 150; /* Above sidebar */
-            background-color: #ffffff; /* White in light mode */
-            color: #1a202c; /* Dark text */
-            padding: 0.5rem 0.75rem;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            display: none; /* Hidden by default, shown on small screens */
-            transition: background-color 0.2s ease, color 0.3s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        html.dark .hamburger-menu {
-            background-color: #374151; /* Light grey (gray-700) in dark mode */
+            background-color: #1a202c; /* Dark background */
             color: #e2e8f0; /* Light text */
         }
-
-        /* Overlay for mobile when sidebar is open */
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 99; /* Below sidebar, above content */
-            display: none; /* Hidden by default */
+        /* Transition for theme change on HTML element */
+        html.transition, html.transition * {
+            transition: all 0.75s ease !important;
         }
-
-        /* Responsive adjustments */
-        @media (max-width: 1023px) { /* Tailwind's 'lg' breakpoint is 1024px */
-            .sidebar {
-                transform: translateX(-100%); /* Hide sidebar by default on smaller screens */
-                box-shadow: none; /* Remove shadow when hidden */
-            }
-            .hamburger-menu {
-                display: block; /* Show hamburger icon */
-            }
-            .main-content-area {
-                margin-left: 0; /* No margin when sidebar is hidden */
-            }
-            html.sidebar-open .sidebar {
-                transform: translateX(0); /* Show sidebar when active */
-                box-shadow: 2px 0 5px rgba(0,0,0,0.5); /* Add shadow when open */
-            }
-            html.sidebar-open .overlay {
-                display: block; /* Show overlay when sidebar is open */
-            }
-            html.sidebar-open .main-content-area {
-                /* Optional: push content slightly to the right to hint at sidebar, but simpler to keep at 0 */
-                /* margin-left: 50%; */ 
-            }
+        /* Sidebar styles */
+        .sidebar {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
         }
-
-
-        /* Flash Messages */
+        html.sidebar-open .sidebar {
+            transform: translateX(0);
+        }
+        .sidebar-overlay {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+        html.sidebar-open .sidebar-overlay {
+            visibility: visible;
+            opacity: 1;
+        }
+        /* Flash message styling */
         .flash-message {
             position: fixed;
             top: 20px;
@@ -197,508 +65,172 @@
             100% { opacity: 0; transform: translateY(-20px); }
         }
 
-        /* Responsive Table (remains same) */
-        @media (max-width: 768px) {
-            table, thead, tbody, th, td, tr {
-                display: block;
-            }
-            thead tr {
-                position: absolute;
-                top: -9999px;
-                left: -9999px;
-            }
-            tr {
-                border: 1px solid #ccc;
-                margin-bottom: 15px;
-                border-radius: 8px;
-                overflow: hidden;
-            }
-            td {
-                border: none;
-                border-bottom: 1px solid #eee;
-                position: relative;
-                padding-left: 50%;
-                text-align: right;
-            }
-            td:last-child {
-                border-bottom: 0;
-            }
-            td:before {
-                position: absolute;
-                top: 6px;
-                left: 6px;
-                width: 45%;
-                padding-right: 10px;
-                white-space: nowrap;
-                text-align: left;
-                font-weight: bold;
-            }
-            td:nth-of-type(1):before { content: "{{ get_text('analysis_time') }}"; }
-            td:nth-of-type(2):before { content: "{{ get_text('file_label') }}"; }
-            td:nth-of-type(3):before { content: "{{ get_text('overall_verdict') }}"; }
-            td:nth-of-type(4):before { content: "{{ get_text('confidence_scores') }}"; }
-            td:nth-of-type(5):before { content: "{{ get_text('original_audio') }}"; }
+        /* Dark mode styles for specific elements within the HTML structure */
+        html.dark .bg-white {
+            background-color: #2d3748; /* Darker background for elements that are white in light mode */
+        }
+        html.dark .text-gray-800 {
+            color: #e2e8f0; /* Lighter text for dark mode */
+        }
+        html.dark .text-gray-600, html.dark .text-gray-700 {
+            color: #a0aec0; /* Lighter gray text */
+        }
+        html.dark .border-gray-200 {
+            border-color: #4a5568; /* Darker border */
+        }
+        html.dark .shadow-md {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); /* Stronger shadow in dark mode */
+        }
+        html.dark .bg-gray-100 {
+            background-color: #4a5568; /* Darker background for light gray elements */
+        }
+        html.dark .bg-gray-200 {
+            background-color: #4a5568; /* Darker background for light gray elements */
+        }
+        html.dark .text-indigo-600 {
+            color: #a78bfa; /* Lighter indigo for dark mode */
+        }
+        html.dark .hover\:text-indigo-600:hover {
+            color: #c4b5fd; /* Even lighter indigo on hover */
+        }
+        html.dark .bg-indigo-600 {
+            background-color: #5b21b6; /* Darker indigo for buttons */
+        }
+        html.dark .hover\:bg-indigo-700:hover {
+            background-color: #4c1d95; /* Even darker indigo on hover */
+        }
+        html.dark .bg-emerald-600 {
+            background-color: #047857; /* Darker emerald for buttons */
+        }
+        html.dark .hover\:bg-emerald-700:hover {
+            background-color: #065f46; /* Even darker emerald on hover */
+        }
+        html.dark .bg-red-500 {
+            background-color: #b91c1c; /* Darker red for logout */
+        }
+        html.dark .hover\:bg-red-600:hover {
+            background-color: #991b1b; /* Even darker red on hover */
+        }
+        html.dark .bg-purple-600 {
+            background-color: #7c3aed; /* Darker purple */
+        }
+        html.dark .hover\:bg-purple-700:hover {
+            background-color: #6d28d9; /* Even darker purple */
+        }
+        html.dark .bg-gradient-to-br {
+            background-image: linear-gradient(to bottom right, #2d3748, #1a202c); /* Darker gradient */
+        }
+        html.dark .border-indigo-200 {
+            border-color: #4c1d95; /* Darker border for gradient box */
+        }
+        html.dark .text-indigo-700 {
+            color: #a78bfa; /* Lighter indigo text */
+        }
+        html.dark .text-emerald-600 {
+            color: #34d399; /* Lighter emerald text */
+        }
+        html.dark .text-rose-600 {
+            color: #f87171; /* Lighter rose text */
+        }
+        html.dark .bg-emerald-100 {
+            background-color: #065f46; /* Darker background for emerald light */
+        }
+        html.dark .bg-rose-100 {
+            background-color: #881337; /* Darker background for rose light */
         }
     </style>
 </head>
-<body>
-    <!-- Hamburger Menu Button -->
-    <button id="hamburgerButton" class="hamburger-menu lg:hidden">
-        <i class="fas fa-bars text-xl"></i>
-    </button>
-
-    <!-- Overlay (for mobile sidebar) -->
-    <div id="sidebarOverlay" class="overlay"></div>
-
-    <!-- Left Sidebar Navigation -->
-    <nav class="sidebar">
-        <div class="p-4 flex flex-col h-full">
-            <div class="flex items-center space-x-3 mb-8">
-                {# Removed logo image #}
-                <span class="text-gray-800 dark:text-white text-2xl font-bold">{{ get_text('app_title') }}</span> {# Adjusted text color #}
+<body class="flex flex-col min-h-screen">
+    <!-- Flash Messages Container -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages-container">
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
             </div>
+        {% endif %}
+    {% endwith %}
 
-            <div class="flex flex-col space-y-4 flex-grow">
-                <a href="{{ url_for('home') }}" class="flex items-center space-x-3 px-3 py-2 rounded-md text-lg font-medium transition duration-300">
-                    <i class="fas fa-home"></i> <span>{{ get_text('home_nav') }}</span>
-                </a>
-                <a href="{{ url_for('results') }}" class="flex items-center space-x-3 px-3 py-2 rounded-md text-lg font-medium transition duration-300">
-                    <i class="fas fa-chart-bar"></i> <span>{{ get_text('results_nav') }}</span>
-                </a>
-                <a href="{{ url_for('account') }}" class="flex items-center space-x-3 px-3 py-2 rounded-md text-lg font-medium transition duration-300">
-                    <i class="fas fa-user-circle"></i> <span>{{ get_text('account_nav') }}</span>
-                </a>
-            </div>
-
-            <div class="mt-auto space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700"> {# Adjusted border color #}
-                <span class="text-gray-800 dark:text-gray-300 text-sm block px-3"> {# Adjusted text color #}
-                    {% if user_name %}
-                        {{ get_text('logged_in_as') }} <span class="font-semibold">{{ user_name }}</span>
-                    {% endif %}
-                </span>
-
-                <!-- Language Selector -->
-                <div class="px-3">
-                    <select id="languageSelect" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-base rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition duration-300">
-                        <option value="en" {% if current_language == 'en' %}selected{% endif %}>English</option>
-                        <option value="hi" {% if current_language == 'hi' %}selected{% endif %}>हिन्दी</option>
-                    </select>
-                </div>
-
-                <!-- Dark Mode Toggle Button -->
-                <div class="px-3">
-                    <button id="themeToggle" class="w-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-300 flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-gray-400">
-                        <i class="fas fa-moon dark:hidden"></i>
-                        <i class="fas fa-sun hidden dark:inline-block"></i>
-                        <span>{{ get_text('toggle_theme') }}</span>
-                    </button>
-                </div>
-                
-                <form action="{{ url_for('logout') }}" method="post" class="px-3 pb-2">
-                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300">
-                        <i class="fas fa-sign-out-alt mr-2"></i> {{ get_text('logout_btn') }}
-                    </button>
-                </form>
-            </div>
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
+        <div class="flex items-center">
+            <button id="hamburgerButton" class="text-gray-600 dark:text-gray-300 text-2xl mr-4 focus:outline-none lg:hidden">
+                <i class="fas fa-bars"></i>
+            </button>
+            <a href="{{ url_for('home') }}" class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                {{ get_text('app_title') }}
+            </a>
         </div>
-    </nav>
+        
+        <!-- Desktop Navigation -->
+        <nav class="hidden lg:flex space-x-6">
+            <a href="{{ url_for('home') }}" class="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-lg font-medium transition-colors duration-200">
+                {{ get_text('home_nav') }}
+            </a>
+            <a href="{{ url_for('results') }}" class="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-lg font-medium transition-colors duration-200">
+                {{ get_text('results_nav') }}
+            </a>
+            <a href="{{ url_for('account') }}" class="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-lg font-medium transition-colors duration-200">
+                {{ get_text('account_nav') }}
+            </a>
+        </nav>
 
-    <!-- Main Content Area -->
-    <div class="main-content-area min-h-screen">
-        <!-- Flask Flash Messages Container (positioned fixed) -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages-container">
-                    {% for category, message in messages %}
-                        <div class="flash-message {{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
+        <!-- Right side: Theme Toggle, Language Select, Logout -->
+        <div class="flex items-center space-x-4">
+            <!-- Theme Toggle -->
+            <button id="themeToggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none transition-colors duration-200">
+                <i class="fas fa-sun dark:hidden"></i>
+                <i class="fas fa-moon hidden dark:inline"></i>
+            </button>
 
+            <!-- Language Selector -->
+            <select id="languageSelect" class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-md py-1 px-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="en" {% if current_language == 'en' %}selected{% endif %}>English</option>
+                <option value="hi" {% if current_language == 'hi' %}selected{% endif %}>हिन्दी</option>
+            </select>
+
+            <!-- Logout Form -->
+            <form action="{{ url_for('logout') }}" method="POST" class="ml-4">
+                <button type="submit" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
+                    {{ get_text('logout_btn') }}
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <!-- Sidebar for Mobile -->
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 sidebar-overlay lg:hidden"></div>
+    <aside class="fixed top-0 left-0 w-64 h-full bg-white dark:bg-gray-900 shadow-xl z-40 sidebar lg:hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">{{ get_text('app_title') }}</h2>
+        </div>
+        <nav class="mt-5">
+            <a href="{{ url_for('home') }}" class="block py-3 px-4 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-200">
+                <i class="fas fa-home mr-3"></i> {{ get_text('home_nav') }}
+            </a>
+            <a href="{{ url_for('results') }}" class="block py-3 px-4 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-200">
+                <i class="fas fa-chart-bar mr-3"></i> {{ get_text('results_nav') }}
+            </a>
+            <a href="{{ url_for('account') }}" class="block py-3 px-4 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-200">
+                <i class="fas fa-user-circle mr-3"></i> {{ get_text('account_nav') }}
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-4 sm:p-6 lg:p-8">
         {% block content %}{% endblock %}
-    </div>
+    </main>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const htmlElement = document.documentElement;
-            const hamburgerButton = document.getElementById('hamburgerButton');
-            const sidebarOverlay = document.getElementById('sidebarOverlay');
-            const themeToggle = document.getElementById('themeToggle');
-            const languageSelect = document.getElementById('languageSelect');
+    <!-- Footer -->
+    <footer class="bg-white dark:bg-gray-800 shadow-inner p-4 text-center text-gray-600 dark:text-gray-400 text-sm mt-auto">
+        &copy; {{ current_year }} {{ get_text('app_title') }}. All rights reserved.
+    </footer>
 
-            // Handle sidebar toggle
-            if (hamburgerButton) {
-                hamburgerButton.addEventListener('click', () => {
-                    htmlElement.classList.toggle('sidebar-open');
-                });
-            }
-
-            // Close sidebar when overlay is clicked
-            if (sidebarOverlay) {
-                sidebarOverlay.addEventListener('click', () => {
-                    htmlElement.classList.remove('sidebar-open');
-                });
-            }
-
-            // Theme Toggle Logic
-            if (themeToggle) {
-                themeToggle.addEventListener('click', async () => {
-                    htmlElement.classList.add('transition'); // Add transition to html element
-                    let newMode;
-                    if (htmlElement.classList.contains('dark')) {
-                        htmlElement.classList.remove('dark');
-                        newMode = 'light';
-                    } else {
-                        htmlElement.classList.add('dark');
-                        newMode = 'dark';
-                    }
-
-                    try {
-                        const response = await fetch('/update_preferences', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ preferred_mode: newMode })
-                        });
-                        const data = await response.json();
-                        if (!data.success) {
-                            console.error('Failed to save theme preference to DB:', data.message);
-                        }
-                    } catch (error) {
-                        console.error('Network error saving theme preference:', error);
-                    } finally {
-                        setTimeout(() => {
-                            htmlElement.classList.remove('transition');
-                        }, 750);
-                    }
-                });
-            }
-
-            // Language Selector Logic
-            if (languageSelect) {
-                languageSelect.addEventListener('change', async () => {
-                    const newLanguage = languageSelect.value;
-                    try {
-                        const response = await fetch('/update_preferences', { 
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ preferred_language: newLanguage })
-                        });
-                        const data = await response.json();
-                        if (data.success) {
-                            console.log('Language preference saved to DB successfully!');
-                            window.location.reload(); 
-                        } else {
-                            alert('Failed to update language preference: ' + data.message);
-                        }
-                    } catch (error) {
-                        console.error('Network error updating language preference:', error);
-                        alert('An error occurred while updating language preference.');
-                    }
-                });
-            }
-
-            // Client-side translation utility (if needed, but mainly for home.html)
-            const CLIENT_TRANSLATIONS = {
-                'toggle_theme': {'en': 'Toggle Theme', 'hi': 'थीम टॉगल करें'},
-                'light_mode': {'en': 'Light', 'hi': 'लाइट'},
-                'dark_mode': {'en': 'Dark', 'hi': 'डार्क'},
-                'start_recording_btn': {'en': 'Start Recording', 'hi': 'रिकॉर्डिंग शुरू करें'},
-                'stop_recording_btn': {'en': 'Stop Recording', 'hi': 'रिकॉर्डिंग बंद करें'},
-                'recording_status_recording': {'en': 'Recording...', 'hi': 'रिकॉर्डिंग हो रही है...'},
-                'recording_status_stop_prompt': {'en': 'Recording (Click to stop)', 'hi': 'रिकॉर्डिंग (रोकने के लिए क्लिक करें)'},
-                'recording_status_finished': {'en': 'Recording finished. Ready for analysis.', 'hi': 'रिकॉर्डिंग समाप्त। विश्लेषण के लिए तैयार।'},
-                'mic_error': {'en': 'Error accessing microphone. Please ensure permissions are granted.', 'hi': 'माइक्रोफ़ोन तक पहुंचने में त्रुटि। कृपया सुनिश्चित करें कि अनुमतियाँ दी गई हैं।'},
-                'file_selected': {'en': 'File selected:', 'hi': 'फ़ाइल चुनी गई:'},
-                'no_audio_provided': {'en': 'Please provide audio first (upload or record).', 'hi': 'पहले ऑडियो प्रदान करें (अपलोड करें या रिकॉर्ड करें)।'},
-                'network_error': {'en': 'Network Error', 'hi': 'नेटवर्क त्रुटि'},
-                'audio_processing_failed': {'en': 'Audio processing failed', 'hi': 'ऑडियो प्रोसेसिंग विफल'},
-                'genuine': {'en': 'Genuine', 'hi': 'वास्तविक'},
-                'spoofed': {'en': 'Spoofed', 'hi': 'स्पूफ़ेड'},
-                'no_analysis_yet': {'en': 'No analysis yet.', 'hi': 'अभी तक कोई विश्लेषण नहीं हुआ है।'},
-                'analyzing_audio': {'en': 'Analyzing audio...', 'hi': 'ऑडियो का विश्लेषण हो रहा है...'},
-                'upload_file_label': {'en': 'Upload Audio File (.wav, .mp3, .flac)', 'hi': 'ऑडियो फ़ाइल अपलोड करें (.wav, .mp3, .flac)'},
-                'home_nav': {'en': 'Home', 'hi': 'होम'},
-                'results_nav': {'en': 'Results', 'hi': 'परिणाम'},
-                'account_nav': {'en': 'Account', 'hi': 'खाता'},
-                'logout_btn': {'en': 'Logout', 'hi': 'लॉग आउट'},
-                'dashboard_title': {'en': 'Dashboard', 'hi': 'डैशबोर्ड'},
-                'home_tagline': {'en': 'Upload an audio file or record your voice to determine if it\'s genuine or spoofed.', 'hi': 'यह निर्धारित करने के लिए ऑडियो फ़ाइल अपलोड करें या अपनी आवाज़ रिकॉर्ड करें कि यह वास्तविक है या स्पूफ़ेड।'},
-                'input_audio_header': {'en': 'Input Audio', 'hi': 'ऑडियो इनपुट'},
-                'drag_drop_prompt': {'en': 'Drag & Drop Audio File Here', 'hi': 'यहां ऑडियो फ़ाइल खींचें और छोड़ें'},
-                'or_click_browse': {'en': 'Or Click to Browse', 'hi': 'या ब्राउज़ करने के लिए क्लिक करें'},
-                'record_audio_prompt': {'en': 'Or Record Live Audio', 'hi': 'या लाइव ऑडियो रिकॉर्ड करें'},
-                'analyze_audio_btn': {'en': 'Analyze Audio', 'hi': 'ऑडियो का विश्लेषण करें'},
-                'detection_results_header': {'en': 'Detection Results', 'hi': 'जाँच के परिणाम'},
-                'overall_verdict': {'en': 'Overall Verdict:', 'hi': 'कुल मिलाकर निर्णय:'},
-                'confidence_scores': {'en': 'Confidence Scores:', 'hi': 'विश्वसनीयता स्कोर:'},
-                'play_audio': {'en': 'Play Submitted Audio:', 'hi': 'सबमिट किया गया ऑडियो चलाएं:'},
-                'clear_all_btn': {'en': 'Clear All', 'hi': 'सभी साफ करें'},
-                'last_analysis_results': {'en': 'Last Analysis Results', 'hi': 'अंतिम विश्लेषण परिणाम'},
-                'history_header': {'en': 'Your Audio Analysis History', 'hi': 'आपका ऑडियो विश्लेषण इतिहास'},
-                'analysis_time': {'en': 'Analysis Time:', 'hi': 'विश्लेषण का समय:'},
-                'file_label': {'en': 'File:', 'hi': 'फ़ाइल:'},
-                'original_audio': {'en': 'Original Audio:', 'hi': 'मूल ऑडियो:'},
-                'audio_data_not_available': {'en': 'Audio data not available.', 'hi': 'ऑडियो डेटा उपलब्ध नहीं है।'},
-            };
-            window.getClientText = (key) => { // Make it globally accessible for home.html script
-                const currentLang = htmlElement.lang || 'en';
-                return CLIENT_TRANSLATIONS[key]?.[currentLang] || CLIENT_TRANSLATIONS[key]?.['en'] || key;
-            };
-
-            // Existing home.html related script logic (if present in base.html)
-            // This is primarily relevant if you consolidated all JS into script.js.
-            // If home.html has its own <script> block, this can be removed from here.
-            // For now, I'm keeping it as a fallback / to avoid breaking existing functionality
-            // if the user has a single script.js file for the entire app.
-            const audioFile = document.getElementById('audioFile');
-            const recordButton = document.getElementById('recordButton');
-            const stopButton = document.getElementById('stopButton');
-            const recordingStatus = document.getElementById('recordingStatus');
-            const analyzeButton = document.getElementById('analyzeButton');
-            const audioPlayback = document.getElementById('audioPlayback');
-            const verdictOutput = document.getElementById('verdictOutput');
-            const confGenuine = document.getElementById('confGenuine');
-            const confSpoofed = document.getElementById('confSpoofed');
-            const loadingIndicator = document.getElementById('loadingIndicator');
-            const clearButton = document.getElementById('clearButton');
-            const dropZone = document.getElementById('dropZone');
-            const fileSelectedDisplay = document.getElementById('fileSelectedDisplay'); 
-
-            let mediaRecorder;
-            let audioChunks = [];
-            let recordedAudioBlob = null;
-
-            if (analyzeButton && recordButton && stopButton && audioFile && clearButton && verdictOutput && confGenuine && confSpoofed && loadingIndicator && dropZone) {
-                function enableAnalyzeButton() {
-                    analyzeButton.disabled = false;
-                    analyzeButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
-                    analyzeButton.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'cursor-pointer');
-                }
-
-                function disableAnalyzeButton() {
-                    analyzeButton.disabled = true;
-                    analyzeButton.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'cursor-pointer');
-                    analyzeButton.classList.add('bg-gray-400', 'cursor-not-allowed');
-                }
-
-                function clearResults() {
-                    verdictOutput.textContent = window.getClientText('no_analysis_yet');
-                    verdictOutput.className = 'text-center text-2xl font-extrabold p-4 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 mb-4 min-h-[70px] flex items-center justify-center shadow-md';
-                    confGenuine.textContent = 'N/A';
-                    confSpoofed.textContent = 'N/A';
-                    audioPlayback.src = '';
-                    audioFile.value = ''; 
-                    recordedAudioBlob = null; 
-                    recordingStatus.textContent = ''; 
-                    loadingIndicator.classList.add('hidden');
-                    disableAnalyzeButton(); 
-                    stopRecording(); 
-                    if (fileSelectedDisplay) {
-                        fileSelectedDisplay.textContent = ''; 
-                    }
-                }
-
-                dropZone.addEventListener('dragover', (e) => {
-                    e.preventDefault(); 
-                    dropZone.classList.add('border-indigo-500', 'bg-gray-50', 'dark:bg-gray-700');
-                    dropZone.classList.remove('border-dashed');
-                });
-
-                dropZone.addEventListener('dragleave', (e) => {
-                    e.preventDefault();
-                    dropZone.classList.remove('border-indigo-500', 'bg-gray-50', 'dark:bg-gray-700');
-                    dropZone.classList.add('border-dashed');
-                });
-
-                dropZone.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    dropZone.classList.remove('border-indigo-500', 'bg-gray-50', 'dark:bg-gray-700');
-                    dropZone.classList.add('border-dashed');
-
-                    const files = e.dataTransfer.files;
-                    if (files.length > 0) {
-                        const firstFile = files[0];
-                        if (!firstFile.type.startsWith('audio/')) {
-                            alert('Please drop an audio file.');
-                            return;
-                        }
-                        audioFile.files = files;
-                        audioFile.dispatchEvent(new Event('change', { bubbles: true })); 
-                    }
-                });
-
-                audioFile.addEventListener('change', (event) => {
-                    const file = event.target.files[0]; 
-                    if (file) {
-                        if (!file.type.startsWith('audio/')) {
-                            alert('Please upload an audio file.');
-                            event.target.value = ''; 
-                            recordedAudioBlob = null;
-                            audioPlayback.src = '';
-                            disableAnalyzeButton();
-                            return;
-                        }
-
-                        clearResults(); 
-
-                        recordedAudioBlob = file; 
-                        audioPlayback.src = URL.createObjectURL(file);
-                        enableAnalyzeButton();
-                        if (fileSelectedDisplay) {
-                            fileSelectedDisplay.textContent = `${window.getClientText('file_selected')} ${file.name}`;
-                        }
-                        recordingStatus.textContent = ''; 
-
-                    } else {
-                        recordedAudioBlob = null;
-                        audioPlayback.src = '';
-                        if (fileSelectedDisplay) {
-                            fileSelectedDisplay.textContent = '';
-                        }
-                        disableAnalyzeButton();
-                    }
-                });
-
-                recordButton.addEventListener('click', async () => {
-                    clearResults(); 
-
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                        
-                        let options = {};
-                        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                            options = { mimeType: 'audio/webm;codecs=opus' };
-                        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-                            options = { mimeType: 'audio/webm' };
-                        } else if (MediaRecorder.isTypeSupported('audio/wav')) {
-                            options = { mimeType: 'audio/wav' };
-                        } else {
-                            console.warn('No preferred MIME type for MediaRecorder found. Falling back to browser default.');
-                        }
-
-                        mediaRecorder = new MediaRecorder(stream, options); 
-                        audioChunks = []; 
-
-                        mediaRecorder.ondataavailable = (event) => {
-                            audioChunks.push(event.data); 
-                        };
-
-                        mediaRecorder.onstop = () => {
-                            const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-                            
-                            recordedAudioBlob = blob; 
-                            audioPlayback.src = URL.createObjectURL(blob);
-                            
-                            enableAnalyzeButton(); 
-                            recordingStatus.textContent = window.getClientText('recording_status_finished');
-                            recordButton.innerHTML = `<i class="fas fa-microphone mr-2"></i> ${window.getClientText('start_recording_btn')}`;
-                            recordButton.disabled = false; 
-                            stopButton.disabled = true;
-                            recordButton.classList.remove('active'); 
-                        };
-
-                        mediaRecorder.start(); 
-                        recordingStatus.textContent = window.getClientText('recording_status_recording');
-                        recordButton.innerHTML = `<i class="fas fa-microphone mr-2"></i> ${window.getClientText('recording_status_stop_prompt')}`;
-                        recordButton.disabled = true; 
-                        stopButton.disabled = false;
-                        recordButton.classList.add('active'); 
-                        disableAnalyzeButton(); 
-                        
-                        if (fileSelectedDisplay) {
-                            fileSelectedDisplay.textContent = ''; 
-                        }
-
-                    } catch (err) {
-                        console.error('Error accessing microphone:', err);
-                        recordingStatus.textContent = window.getClientText('mic_error');
-                        recordButton.disabled = false;
-                        stopButton.disabled = true;
-                        recordButton.classList.remove('active');
-                        disableAnalyzeButton();
-                    }
-                });
-
-                stopButton.addEventListener('click', () => {
-                    stopRecording();
-                });
-
-                function stopRecording() {
-                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                        mediaRecorder.stop(); 
-                        mediaRecorder.stream.getTracks().forEach(track => track.stop()); 
-                        recordButton.disabled = false; 
-                        stopButton.disabled = true; 
-                    }
-                }
-
-                analyzeButton.addEventListener('click', async () => {
-                    if (!recordedAudioBlob) {
-                        verdictOutput.textContent = window.getClientText('no_audio_provided');
-                        verdictOutput.className = 'text-center text-2xl font-extrabold p-4 rounded-lg bg-rose-100 border-2 border-rose-400 text-rose-700 mb-4 min-h-[70px] flex items-center justify-center shadow-md';
-                        return;
-                    }
-
-                    loadingIndicator.classList.remove('hidden');
-                    disableAnalyzeButton();
-                    verdictOutput.textContent = window.getClientText('analyzing_audio');
-                    verdictOutput.className = 'text-center text-2xl font-extrabold p-4 rounded-lg bg-gray-100 border-2 border-gray-300 text-indigo-600 mb-4 min-h-[70px] flex items-center justify-center shadow-md';
-                    confGenuine.textContent = 'Analyzing...';
-                    confSpoofed.textContent = 'Analyzing...';
-
-                    const formData = new FormData();
-                    const fileName = audioFile.files && audioFile.files[0] ? audioFile.files[0].name : `recorded_audio.${recordedAudioBlob.type.split('/')[1] || 'webm'}`;
-                    formData.append('audio', recordedAudioBlob, fileName); 
-
-                    try {
-                        const response = await fetch('/predict', {
-                            method: 'POST',
-                            body: formData,
-                        });
-
-                        const data = await response.json();
-
-                        loadingIndicator.classList.add('hidden');
-                        enableAnalyzeButton(); 
-
-                        if (response.ok) { 
-                            if (data.redirect_to) {
-                                window.location.href = data.redirect_to; 
-                            } else {
-                                verdictOutput.textContent = data.verdict;
-                                if (data.verdict.includes(window.getClientText('spoofed')) || data.verdict.includes('Spoofed')) { 
-                                    verdictOutput.className = 'text-center text-2xl font-extrabold p-4 rounded-lg bg-rose-100 border-2 border-rose-400 text-rose-700 mb-4 min-h-[70px] flex items-center justify-center shadow-md'; 
-                                } else {
-                                    verdictOutput.className = 'text-center text-2xl font-extrabold p-4 rounded-lg bg-emerald-100 border-2 border-emerald-400 text-emerald-700 mb-4 min-h-[70px] flex items-center justify-center shadow-md'; 
-                                }
-                                confGenuine.textContent = (data.confidence.Genuine * 100).toFixed(2) + '%';
-                                confSpoofed.textContent = (data.confidence.Spoofed * 100).toFixed(2) + '%';
-                            }
-
-                        } else { 
-                            verdictOutput.textContent = `Error: ${data.error || window.getClientText('network_error')}`;
-                            verdictOutput.className = 'text-center text-2xl font-extrabold p-4 rounded-lg bg-rose-100 border-2 border-rose-400 text-rose-700 mb-4 min-h-[70px] flex items-center justify-center shadow-md'; 
-                            confGenuine.textContent = 'N/A';
-                            confSpoofed.textContent = 'N/A';
-                        }
-
-                    } catch (error) { 
-                        console.error('Network or fetch error:', error);
-                        loadingIndicator.classList.add('hidden');
-                        enableAnalyzeButton();
-                        verdictOutput.textContent = `${window.getClientText('network_error')}: ${error.message}.`;
-                        verdictOutput.className = 'text-center text-2xl font-extrabold p-4 rounded-lg bg-rose-100 border-2 border-rose-400 text-rose-700 mb-4 min-h-[70px] flex items-center justify-center shadow-md'; 
-                        confGenuine.textContent = 'N/A';
-                        confSpoofed.textContent = 'N/A';
-                    }
-                });
-
-                clearButton.addEventListener('click', clearResults);
-
-                disableAnalyzeButton(); 
-            }
-        });
-    </script>
+    <!-- Main JavaScript file -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>
+l
