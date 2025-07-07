@@ -1,566 +1,434 @@
 import os
-import io
-import base64
-import numpy as np
-import librosa
-import tensorflow as tf
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
-from werkzeug.security import generate_password_hash, check_password_hash
+import requests
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, send_from_directory
 from pymongo import MongoClient
-from bson.binary import Binary 
-from datetime import datetime
-from pydub import AudioSegment
+import uuid # For unique filenames
+import librosa # For audio processing
+import numpy as np # For numerical operations
+import soundfile as sf # For saving audio data
+import tensorflow as tf # For loading and using the Keras model
+from tensorflow.keras.models import load_model # Specific import for loading
+from werkzeug.security import generate_password_hash, check_password_hash # For password hashing
+from datetime import datetime # For timestamps in analysis history
 
-app = Flask(__name__)
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'a_very_secret_key_for_demo_purposes_only')
+# --- Flask App Setup ---
+# Ensure static_folder is correctly set to 'static'
+app = Flask(__name__, static_folder='static', template_folder='templates')
+
+# Configure Secret Key for Sessions
+# IMPORTANT: Use a strong, random key in production and load from environment variables!
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your_super_secret_key_here')
+
+# --- Configuration for Audio and Model ---
+UPLOAD_FOLDER = 'uploads' # Folder to temporarily save audio files
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # --- MongoDB Configuration ---
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/')
-DB_NAME = 'voice_spoofing_db'
-USERS_COLLECTION_NAME = 'users'
-AUDIO_RECORDS_COLLECTION_NAME = 'audio_records' 
+MONGO_DB_NAME = os.environ.get('MONGO_DB_NAME', 'voice_spoofing_db')
 
-try:
-    mongo_client = MongoClient(MONGO_URI)
-    db_mongo = mongo_client[DB_NAME]
-    users_collection = db_mongo[USERS_COLLECTION_NAME]
-    audio_records_collection = db_mongo[AUDIO_RECORDS_COLLECTION_NAME] 
-except Exception as e:
-    print(f"[{os.path.basename(__file__)}] ERROR: MongoDB connection failed: {e}")
-    mongo_client = None
-    db_mongo = None
-    users_collection = None
-    audio_records_collection = None
+client = MongoClient(MONGO_URI)
+db = client[MONGO_DB_NAME]
 
-# --- Configuration for Audio Processing and CNN Model ---
-TARGET_SAMPLE_RATE = 16000
-N_MFCC = 40
-TARGET_MFCC_FRAMES = 94 
+# Collections
+users_collection = db.users
+analyses_collection = db.analyses
 
-MODEL_DIR = "your_model_files" 
-MODEL_NAME = "your_cnn_model.h5" 
-MODEL_PATH = os.path.join(MODEL_DIR, MODEL_NAME)
+# Model and audio processing constants (from ntcc-model-code.ipynb)
+SAMPLE_RATE = 16000      # 16 kHz audio
+CLIP_LENGTH = 5          # seconds per file
+N_MELS = 128             # Mel spectrogram feature size
+MAX_T = 501              # Expected time dimension of Mel spectrogram for 5-second clips
+N_FFT = 400              # FFT window size
+HOP_LENGTH = 160         # Hop length for spectrogram calculation
 
-# Global variable to store the last prediction result for the Results page
-last_prediction_result = {
-    "verdict": "No analysis performed yet.",
-    "confidence": {"Genuine": 0.5, "Spoofed": 0.5}
-}
+# Path to your pre-trained Keras model (from ntcc-model-code.ipynb)
+MODEL_SAVE_PATH = 'audio_spoof_model_improved_regularized_final.h5'
 
-# --- CNN Model Loading ---
-CNN_MODEL = None
-try:
-    if not os.path.exists(MODEL_DIR):
-        os.makedirs(MODEL_DIR)
+# Global variable for the local model
+global_spoofing_model = None
 
-    if os.path.exists(MODEL_PATH):
-        CNN_MODEL = tf.keras.models.load_model(MODEL_PATH)
-        print(f"[{os.path.basename(__file__)}] CNN model loaded successfully from {MODEL_PATH}.")
-    else:
-        print(f"[{os.path.basename(__file__)}] Model file not found at {MODEL_PATH}. Creating a dummy CNN model.")
-        CNN_MODEL = tf.keras.models.Sequential([
-            tf.keras.layers.InputLayer(input_shape=(N_MFCC, TARGET_MFCC_FRAMES, 1)),
-            tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
-            tf.keras.layers.MaxPooling2D((2, 2)),
-            tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
-            tf.keras.layers.MaxPooling2D((2, 2)),
-            tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(128, activation='relu'),
-            tf.keras.layers.Dropout(0.5),
-            tf.keras.layers.Dense(2, activation='softmax')
-        ])
-        CNN_MODEL.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-        CNN_MODEL.save(MODEL_PATH)
-        print(f"[{os.path.basename(__file__)}] Dummy CNN model created and saved to {MODEL_PATH}.")
-        print(f"[{os.path.basename(__file__)}] This model will produce random-like predictions as it's untrained.")
-
-except Exception as e:
-    CNN_MODEL = None
-    print(f"[{os.path.basename(__file__)}] ERROR: Loading or creating CNN model failed: {e}. Predictions will fallback to random dummy values.")
-
-# --- Language Translations ---
-TRANSLATIONS = {
-    'app_title': {'en': 'Voice Spoofing Detector', 'hi': 'वॉयस स्पूफिंग डिटेक्टर'},
-    'dashboard_title': {'en': 'Dashboard', 'hi': 'डैशबोर्ड'},
-    'home_nav': {'en': 'Home', 'hi': 'होम'},
-    'results_nav': {'en': 'Results', 'hi': 'परिणाम'},
-    'account_nav': {'en': 'Account', 'hi': 'खाता'},
-    'logout_btn': {'en': 'Logout', 'hi': 'लॉग आउट'},
-    'login_title': {'en': 'Login or Register', 'hi': 'लॉगिन या रजिस्टर करें'},
-    'login_prompt': {'en': 'Please enter your credentials.', 'hi': 'कृपया अपनी क्रेडेंशियल दर्ज करें।'},
-    'username_label': {'en': 'Username:', 'hi': 'यूज़रनेम:'},
-    'password_label': {'en': 'Password:', 'hi': 'पासवर्ड:'},
-    'login_btn': {'en': 'Login', 'hi': 'लॉगिन करें'},
-    'register_btn': {'en': 'Register', 'hi': 'रजिस्टर करें'},
-    'reg_info': {'en': 'If username does not exist, an account will be created.', 'hi': 'यदि यूज़रनेम मौजूद नहीं है, तो एक खाता बनाया जाएगा।'},
-    'home_tagline': {'en': 'Upload an audio file or record your voice to determine if it\'s genuine or spoofed.', 'hi': 'यह निर्धारित करने के लिए ऑडियो फ़ाइल अपलोड करें या अपनी आवाज़ रिकॉर्ड करें कि यह वास्तविक है या स्पूफ़ेड।'},
-    'input_audio_header': {'en': 'Input Audio', 'hi': 'ऑडियो इनपुट'},
-    'drag_drop_prompt': {'en': 'Drag & Drop Audio File Here', 'hi': 'यहां ऑडियो फ़ाइल खींचें और छोड़ें'},
-    'or_click_browse': {'en': 'Or Click to Browse', 'hi': 'या ब्राउज़ करने के लिए क्लिक करें'},
-    'record_audio_prompt': {'en': 'Or Record Live Audio', 'hi': 'या लाइव ऑडियो रिकॉर्ड करें'},
-    'start_recording_btn': {'en': 'Start Recording', 'hi': 'रिकॉर्डिंग शुरू करें'},
-    'stop_recording_btn': {'en': 'Stop Recording', 'hi': 'रिकॉर्डिंग बंद करें'},
-    'analyze_audio_btn': {'en': 'Analyze Audio', 'hi': 'ऑडियो का विश्लेषण करें'},
-    'detection_results_header': {'en': 'Detection Results', 'hi': 'जाँच के परिणाम'},
-    'overall_verdict': {'en': 'Overall Verdict:', 'hi': 'कुल मिलाकर निर्णय:'},
-    'confidence_scores': {'en': 'Confidence Scores:', 'hi': 'विश्वसनीयता स्कोर:'},
-    'genuine': {'en': 'Genuine', 'hi': 'वास्तविक'}, 
-    'spoofed': {'en': 'Spoofed', 'hi': 'स्पूफ़ेड'},   
-    'play_audio': {'en': 'Play Submitted Audio:', 'hi': 'सबमिट किया गया ऑडियो चलाएं:'},
-    'clear_all_btn': {'en': 'Clear All', 'hi': 'सभी साफ करें'},
-    'no_analysis_yet': {'en': 'No analysis yet.', 'hi': 'अभी तक कोई विश्लेषण नहीं हुआ है।'},
-    'analyzing_audio': {'en': 'Analyzing audio...', 'hi': 'ऑडियो का विश्लेषण हो रहा है...'},
-    'no_audio_provided': {'en': 'Please provide audio first (upload or record).', 'hi': 'पहले ऑडियो प्रदान करें (अपलोड करें या रिकॉर्ड करें)।'},
-    'network_error': {'en': 'Network Error', 'hi': 'नेटवर्क त्रुटि'},
-    'analysis_summary': {'en': 'Quick Summary:', 'hi': 'त्वरित सारांश:'}, 
-    'view_full_history': {'en': 'View Full Analysis History', 'hi': 'पूरा विश्लेषण इतिहास देखें'},
-    'thank_you_title': {'en': 'Analysis Complete! Thank You!', 'hi': 'विश्लेषण पूर्ण! धन्यवाद!'},
-    'thank_you_message': {'en': 'Your audio has been successfully analyzed.', 'hi': 'आपके ऑडियो का सफलतापूर्वक विश्लेषण किया गया है।'},
-    'last_analysis_results': {'en': 'Last Analysis Results', 'hi': 'अंतिम विश्लेषण परिणाम'},
-    'history_header': {'en': 'Your Audio Analysis History', 'hi': 'आपका ऑडियो विश्लेषण इतिहास'},
-    'analysis_time': {'en': 'Analysis Time:', 'hi': 'विश्लेषण का समय:'},
-    'file_label': {'en': 'File:', 'hi': 'फ़ाइल:'},
-    'original_audio': {'en': 'Original Audio:', 'hi': 'मूल ऑडियो:'},
-    'no_records_found': {'en': 'No previous analysis records found for your account.', 'hi': 'आपके खाते के लिए कोई पिछला विश्लेषण रिकॉर्ड नहीं मिला।'},
-    'audio_data_not_available': {'en': 'Audio data not available.', 'hi': 'ऑडियो डेटा उपलब्ध नहीं है।'},
-    'account_header': {'en': 'My Account', 'hi': 'मेरा खाता'},
-    'account_tagline': {'en': 'View and manage your account settings.', 'hi': 'अपनी खाता सेटिंग्स देखें और प्रबंधित करें।'},
-    'user_info_header': {'en': 'User Information', 'hi': 'उपयोगकर्ता जानकारी'},
-    'username_display': {'en': 'Username:', 'hi': 'यूज़रनेम:'},
-    'preferred_theme': {'en': 'Preferred Theme:', 'hi': 'पसंदीदा थीम:'},
-    'account_created': {'en': 'Account Created:', 'hi': 'खाता बनाया गया:'},
-    'last_login': {'en': 'Last Login:', 'hi': 'अंतिम लॉगिन:'},
-    'save_preferences_btn': {'en': 'Save Preferences', 'hi': 'पसंद सहेजें'},
-    'no_user_data': {'en': 'No user data found. Please log in.', 'hi': 'कोई उपयोगकर्ता डेटा नहीं मिला। कृपया लॉग इन करें।'},
-    'toggle_theme': {'en': 'Toggle Theme', 'hi': 'थीम टॉगल करें'},
-    'light_mode': {'en': 'Light', 'hi': 'लाइट'},
-    'dark_mode': {'en': 'Dark', 'hi': 'डार्क'},
-    'select_language': {'en': 'Select Language:', 'hi': 'भाषा चुनें:'},
-    'recording_status_recording': {'en': 'Recording...', 'hi': 'रिकॉर्डिंग हो रही है...'},
-    'recording_status_stop_prompt': {'en': 'Recording (Click to stop)', 'hi': 'रिकॉर्डिंग (रोकने के लिए क्लिक करें)'},
-    'recording_status_finished': {'en': 'Recording finished. Ready for analysis.', 'hi': 'रिकॉर्डिंग समाप्त। विश्लेषण के लिए तैयार।'},
-    'mic_error': {'en': 'Error accessing microphone. Please ensure permissions are granted.', 'hi': 'माइक्रोफ़ोन तक पहुंचने में त्रुटि। कृपया सुनिश्चित करें कि अनुमतियाँ दी गई हैं।'},
-    'file_selected': {'en': 'File selected:', 'hi': 'फ़ाइल चुनी गई:'},
-    'upload_file_label': {'en': 'Upload Audio File (.wav, .mp3)', 'hi': 'ऑडियो फ़ाइल अपलोड करें (.wav, .mp3)'},
-    'logged_in_as': {'en': 'Logged in as: ', 'hi': 'के रूप में लॉग इन किया गया है: '}, 
-    'supported': {'en': 'supported', 'hi': 'समर्थित'},
-    'user_not_authenticated': {'en': 'User not authenticated.', 'hi': 'उप उपयोगकर्ता प्रमाणित नहीं है।'},
-    'no_audio_file_provided': {'en': 'No audio file provided.', 'hi': 'कोई ऑडियो फ़ाइल प्रदान नहीं की गई।'},
-    'failed_load_audio_empty': {'en': 'Failed to load audio: Empty or invalid audio data after librosa.load.', 'hi': 'ऑडियो लोड करने में विफल: librosa.load के बाद खाली या अमान्य ऑडियो डेटा।'},
-    'failed_preprocess_audio': {'en': 'Failed to preprocess audio (e.g., audio too short or silent).', 'hi': 'ऑडियो को प्रीप्रोसेस करने में विफल (जैसे, ऑडियो बहुत छोटा या मौन)।'},
-    'audio_processing_failed': {'en': 'Audio processing failed', 'hi': 'ऑडियो प्रोसेसिंग विफल हुई'},
-    'please_login_access_dashboard': {'en': 'Please log in to access the dashboard.', 'hi': 'डैशबोर्ड तक पहुंचने के लिए कृपया लॉग इन करें।'},
-    'invalid_session_login_again': {'en': 'Your session is invalid. Please log in again.', 'hi': 'आपका सत्र अमान्य है। कृपया फिर से लॉग इन करें।'},
-    'please_login_view_account': {'en': 'Please log in to view your account.', 'hi': 'अपना खाता देखने के लिए कृपया लॉग इन करें।'},
-    'database_not_available': {'en': 'Database not available. Please contact admin.', 'hi': 'डेटाबेस उपलब्ध नहीं है। कृपया व्यवस्थापक से संपर्क करें।'},
-    'username_password_required': {'en': 'Username and password are required.', 'hi': 'यूज़रनेम और पासवर्ड आवश्यक हैं।'},
-    'username_exists': {'en': 'Username already exists. Please choose a different one or log in.', 'hi': 'यूज़रनेम पहले से मौजूद है। कृपया कोई भिन्न चुनें या लॉग इन करें।'},
-    'account_created_logged_in': {'en': 'Account created and logged in successfully for {username}!', 'hi': '{username} के लिए खाता सफलतापूर्वक बनाया और लॉग इन किया गया!'},
-    'welcome_back': {'en': 'Welcome back, {username}!', 'hi': 'वापस स्वागत है, {username}!'},
-    'invalid_username_password': {'en': 'Invalid username or password.', 'hi': 'अमान्य यूज़रनेम या पासवर्ड।'},
-    'username_not_found': {'en': 'Username not found. Please register or check your username.', 'hi': 'यूज़रनेम नहीं मिला। कृपया रजिस्टर करें या अपना यूज़रनेम जांचें।'},
-    'invalid_action': {'en': 'Invalid action.', 'hi': 'अमान्य कार्रवाई।'},
-    'an_error_occurred': {'en': 'An error occurred', 'hi': 'एक त्रुटि हुई'},
-    'logged_out_successfully': {'en': 'You have been logged out successfully!', 'hi': 'आप सफलतापूर्वक लॉग आउट हो गए हैं!'},
-    'results_tagline': {'en': 'Here are the results from your most recent voice analysis.', 'hi': 'यहां आपके सबसे हाल के वॉयस विश्लेषण के परिणाम दिए गए हैं।'},
-    'welcome_back_generic': {'en': 'Welcome!', 'hi': 'स्वागत है!'},
-    'to_our_channel': {'en': 'To Our Application', 'hi': 'हमारे एप्लिकेशन में'},
-    'login_page_intro_text': {'en': 'Analyze voice for spoofing detection. Log in or register to get started.', 'hi': 'स्पूफिंग डिटेक्शन के लिए आवाज का विश्लेषण करें। शुरू करने के लिए लॉग इन करें या रजिस्टर करें।'},
-    'remember_me': {'en': 'Remember Me', 'hi': 'मुझे याद रखें'},
-    'forget_password': {'en': 'Forgot Password?', 'hi': 'पासवर्ड भूल गए?'},
-    'dont_have_account': {'en': 'Don\'t have an account?', 'hi': 'खाता नहीं है?'},
-    'already_have_account': {'en': 'Already have an account?', 'hi': 'पहले से ही खाता है?'},
-    'download_audio': {'en': 'Download Audio', 'hi': 'ऑडियो डाउनलोड करें'}, 
-    'playback_speed': {'en': 'Playback Speed', 'hi': 'प्लेबैक गति'}, 
-    'welcome_to_voicesentinel': {'en': 'Welcome to VoiceSentinel!', 'hi': 'वॉयससेंटिनल में आपका स्वागत है!'}, 
-    'voicesentinel_description_part1': {'en': 'Your ultimate solution for detecting voice spoofing. In an era where digital voices are becoming indistinguishable from real ones, securing your verbal interactions is paramount. Our advanced system uses cutting-edge machine learning to identify synthetic or manipulated voices, ensuring your peace of mind in a world of evolving threats.', 'hi': 'वॉयस स्पूफिंग का पता लगाने के लिए आपका अंतिम समाधान। ऐसे युग में जहां डिजिटल आवाजें वास्तविक लोगों से अप्रभेद्य होती जा रही हैं, आपके मौखिक इंटरैक्शन को सुरक्षित करना सर्वोपरि है। हमारी उन्नत प्रणाली सिंथेटिक या हेरफेर की गई आवाजों की पहचान करने के लिए अत्याधुनिक मशीन लर्निंग का उपयोग करती है, जो विकसित होती खतरों की दुनिया में आपकी मन की शांति सुनिश्चित करती है।'}, 
-    'voicesentinel_description_part2': {'en': 'Simply upload an audio file or use your microphone to get an instant analysis. Protect your privacy and security with confidence.', 'hi': 'तत्काल विश्लेषण प्राप्त करने के लिए बस एक ऑडियो फ़ाइल अपलोड करें या अपने माइक्रोफ़ोन का उपयोग करें। आत्मविश्वास के साथ अपनी गोपनीयता और सुरक्षा को सुरक्षित रखें।'}, 
-    'rise_of_spoofing_attacks': {'en': 'The Rise of Voice Spoofing Attacks', 'hi': 'वॉयस स्पूफिंग हमलों का उदय'},
-    'rise_of_spoofing_attacks_description': {
-        'en': 'Simply upload an audio file or use your microphone to get an instant analysis. Protect your privacy and security with confidence.',
-        'hi': 'तत्काल विश्लेषण प्राप्त करने के लिए बस एक ऑडियो फ़ाइल अपलोड करें या अपने माइक्रोफ़ोन का उपयोग करें। आत्मविश्वास के साथ अपनी गोपनीयता और सुरक्षा को सुरक्षित रखें.'
-    },
-    'not_audio_file': {'en': 'Please drop an audio file.', 'hi': 'कृपया एक ऑडियो फ़ाइल गिराएँ।'},
-    'not_audio_file_uploaded': {'en': 'Please upload an audio file.', 'hi': 'कृपया एक ऑडियो फ़ाइल अपलोड करें।'},
-    'no_audio_to_download': {'en': 'No audio to download.', 'hi': 'डाउनलोड करने के लिए कोई ऑडियो नहीं है।'},
-}
-
-def get_translated_text(key):
-    """Retrieves translated text based on the session's preferred language."""
-    lang = session.get('preferred_language', 'en')
-    return TRANSLATIONS.get(key, {}).get(lang, TRANSLATIONS.get(key, {}).get('en', key))
-
-@app.context_processor
-def inject_translations():
-    """Injects translation function and current language, and current year into all templates."""
-    return dict(
-        get_text=get_translated_text,
-        current_language=session.get('preferred_language', 'en'),
-        current_year=datetime.now().year # Inject current year
-    )
-
-
-# --- Audio Preprocessing Function ---
-def preprocess_audio(audio_data, original_sr):
-    if original_sr != TARGET_SAMPLE_RATE:
-        audio_data = librosa.resample(y=audio_data, orig_sr=original_sr, target_sr=TARGET_SAMPLE_RATE)
-        original_sr = TARGET_SAMPLE_RATE
-    if audio_data.size == 0:
+def load_spoofing_model():
+    """
+    Loads the pre-trained voice spoofing detection model.
+    This function will load the Keras model saved from your notebook.
+    """
+    global global_spoofing_model
+    print(f"Attempting to load model from: {os.path.abspath(MODEL_SAVE_PATH)}")
+    if not os.path.exists(MODEL_SAVE_PATH):
+        print(f"Error: Model file NOT FOUND at {os.path.abspath(MODEL_SAVE_PATH)}. Please ensure it's in the correct directory.")
+        global_spoofing_model = None
         return None
-    mfccs = librosa.feature.mfcc(y=audio_data, sr=original_sr, n_mfcc=N_MFCC)
-    if mfccs.shape[1] < TARGET_MFCC_FRAMES:
-        pad_width = TARGET_MFCC_FRAMES - mfccs.shape[1]
-        mfccs = np.pad(mfccs, pad_width=((0, 0), (0, pad_width)), mode='constant')
-    elif mfccs.shape[1] > TARGET_MFCC_FRAMES:
-        mfccs = mfccs[:, :TARGET_MFCC_FRAMES]
-    min_val = np.min(mfccs)
-    max_val = np.max(mfccs)
-    if (max_val - min_val) > 0:
-        mfccs = (mfccs - min_val) / (max_val - min_val)
-    else:
-        mfccs = np.zeros_like(mfccs)
-    processed_features = mfccs[np.newaxis, :, :, np.newaxis]
-    return processed_features
-
-# --- CNN Prediction Function ---
-def predict_with_cnn(features):
-    if CNN_MODEL is None:
-        random_score = np.random.rand()
-        if random_score > 0.6:
-            prob_genuine = np.random.uniform(0.7, 0.95)
-            prob_spoofed = 1.0 - prob_genuine
-        elif random_score < 0.3:
-            prob_spoofed = np.random.uniform(0.7, 0.95)
-            prob_genuine = 1.0 - prob_spoofed
-        else:
-            prob_genuine = np.random.uniform(0.4, 0.6)
-            prob_spoofed = 1.0 - prob_genuine
-        probs = np.array([prob_genuine, prob_spoofed])
-        probs = probs / np.sum(probs)
-        probs = np.clip(probs, 0.001, 0.999)
-        
-        # Determine verdict based on probabilities and then get localized text
-        if probs[0] > probs[1]:
-            verdict_en = "✅ Genuine"
-            verdict_current_lang = f"✅ {get_translated_text('genuine')}"
-        else:
-            verdict_en = "🔴 Spoofed Voice Detected!"
-            verdict_current_lang = f"🔴 {get_translated_text('spoofed')}"
-            
-        confidence_breakdown = {"Genuine": float(probs[0]), "Spoofed": float(probs[1])}
-        return verdict_current_lang, verdict_en, confidence_breakdown
     try:
-        predictions = CNN_MODEL.predict(features, verbose=0)[0]
-        prob_genuine = predictions[0]
-        prob_spoofed = predictions[1]
-        
-        # Determine verdict based on probabilities and then get localized text
-        if prob_genuine > prob_spoofed:
-            verdict_en = "✅ Genuine"
-            verdict_current_lang = f"✅ {get_translated_text('genuine')}" 
-        else:
-            verdict_en = "🔴 Spoofed Voice Detected!"
-            verdict_current_lang = f"🔴 {get_translated_text('spoofed')}" 
-
-        confidence_breakdown = {"Genuine": float(prob_genuine), "Spoofed": float(prob_spoofed)}
-        return verdict_current_lang, verdict_en, confidence_breakdown
+        # Clear any previous Keras session to ensure a fresh load
+        tf.keras.backend.clear_session()
+        global_spoofing_model = load_model(MODEL_SAVE_PATH)
+        global_spoofing_model.summary() # Print model summary to confirm load
+        print(f"Successfully loaded voice spoofing model from {MODEL_SAVE_PATH}")
     except Exception as e:
-        print(f"[{os.path.basename(__file__)}] Error during CNN prediction: {e}")
-        return f"Prediction Error: {e}", f"Prediction Error: {e}", {"Genuine": 0.5, "Spoofed": 0.5}
+        print(f"CRITICAL ERROR loading spoofing model: {e}")
+        print("Please ensure TensorFlow and Keras are correctly installed and the .h5 file is not corrupted.")
+        global_spoofing_model = None
+    return global_spoofing_model
+
+def preprocess_audio_for_model(audio_path):
+    """
+    Processes an audio file to generate the Mel spectrogram features
+    required by the TensorFlow model, following the logic from your notebook.
+    """
+    try:
+        # Load audio using librosa
+        try:
+            audio, _ = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True) # Ensure mono and correct SR
+        except Exception as e_load:
+            print(f"ERROR: Failed to load audio file {audio_path} with librosa. Reason: {e_load}")
+            print("This often indicates missing FFmpeg or libsndfile. Please check your system dependencies.")
+            return None
+
+        # Silence Trimming with Librosa
+        audio_trimmed, _ = librosa.effects.trim(audio, top_db=60)
+        if audio_trimmed.shape[0] == 0:
+            # Handle empty audio after trim: return a dummy silent array
+            audio_trimmed = np.zeros(int(SAMPLE_RATE * CLIP_LENGTH), dtype=np.float32) # Cast to int
+            print("Warning: Audio was completely silent after trimming. Using dummy silent array.")
+
+        # Ensure uniform length (padding or truncation)
+        target_audio_length = int(SAMPLE_RATE * CLIP_LENGTH) # Cast to int
+        if len(audio_trimmed) > target_audio_length:
+            audio_processed = audio_trimmed[:target_audio_length]
+        else:
+            padding_needed = target_audio_length - len(audio_trimmed);
+            audio_processed = np.pad(audio_trimmed, (0, padding_needed), mode='constant')
+
+        # Generate Mel spectrogram
+        mel_spec = librosa.feature.melspectrogram(
+            y=audio_processed, sr=SAMPLE_RATE, n_mels=N_MELS, n_fft=N_FFT, hop_length=HOP_LENGTH
+        )
+        mel_db = librosa.power_to_db(mel_spec, ref=np.max)
+
+        # DEBUG: Print shape before padding/truncation
+        print(f"DEBUG: mel_db.shape[1] BEFORE padding/truncation: {mel_db.shape[1]}")
+
+        # Ensure spectrogram time dimension is consistent with MAX_T
+        if mel_db.shape[1] < MAX_T:
+            pad_amt = MAX_T - mel_db.shape[1]
+            mel_db = np.pad(mel_db, ((0,0),(0,pad_amt)), mode='constant')
+            print(f"DEBUG: Padded mel_db to shape: {mel_db.shape}")
+        elif mel_db.shape[1] > MAX_T:
+            mel_db = mel_db[:, :MAX_T]
+            print(f"DEBUG: Truncated mel_db to shape: {mel_db.shape}")
+
+        # Add channel dimension and ensure float32 type for TensorFlow input
+        # The model expects input shape (batch_size, N_MELS, MAX_T, 1)
+        features = mel_db[np.newaxis, ..., np.newaxis].astype(np.float32)
+        # DEBUG: Print final features shape
+        print(f"DEBUG: Features shape before returning: {features.shape}")
+        return features
+
+    except Exception as e:
+        print(f"Error processing audio for model: {e}")
+        return None
+
+# --- Routes ---
 
 @app.before_request
-def check_login_and_load_user_data():
-    # Set default language if not in session (e.g., first visit, or after logout)
-    if 'preferred_language' not in session:
-        session['preferred_language'] = 'en'
-
-    # Allow access to static files, login page, and login submission without authentication
-    if request.path.startswith('/static/') or request.path == '/login' or request.path == '/login_submit':
-        return 
-    
-    if 'user_id' not in session:
-        flash(get_translated_text('please_login_access_dashboard'), 'error')
-        return redirect(url_for('login'))
-    
-    if users_collection is not None:
-        user_doc = users_collection.find_one({'username': session['user_id']})
-        if user_doc:
-            session['preferred_mode'] = user_doc.get('preferred_mode', 'light') 
-            session['preferred_language'] = user_doc.get('preferred_language', 'en')
-        else:
-            session.pop('user_id', None)
-            session.pop('preferred_mode', None)
-            session.pop('preferred_language', None)
-            flash(get_translated_text('invalid_session_login_again'), 'error')
-            return redirect(url_for('login'))
-    else:
-        print(f"[{os.path.basename(__file__)}] WARNING: users_collection is None. Database not available for session check.")
-        flash(get_translated_text('database_not_available'), 'error')
-        return redirect(url_for('login'))
-
+def before_request():
+    # Load the model once when the app starts or before the first request
+    global global_spoofing_model
+    if global_spoofing_model is None:
+        load_spoofing_model()
 
 @app.route('/')
-def root_redirect():
-    """Redirects to the home page."""
-    return redirect(url_for('home'))
+def index():
+    """
+    Serves the main application HTML page.
+    """
+    return render_template('app.html')
 
-@app.route('/home')
-def home():
-    """Renders the home page with audio input."""
-    try:
-        return render_template('home.html', last_prediction=last_prediction_result,
-                               user_name=session.get('user_id'), preferred_mode=session.get('preferred_mode'))
-    except Exception as e:
-        print(f"[{os.path.basename(__file__)}] ERROR: Exception during home rendering: {e}")
-        return "<h1>Server Error</h1><p>Could not load home page: " + str(e) + "</p><p>Check Flask terminal for details.</p>", 500
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    """
+    Serves static files from the 'static' directory.
+    This now correctly serves script.js and style.css from the 'static' folder.
+    """
+    return send_from_directory(app.static_folder, filename)
 
-@app.route('/results')
-def results():
-    """Renders the results page."""
-    try:
-        user_audio_records = []
-        if audio_records_collection is not None and 'user_id' in session:
-            user_audio_records = list(audio_records_collection.find({'user_id': session['user_id']}).sort('timestamp', -1))
-            for record in user_audio_records:
-                if 'timestamp' in record and isinstance(record['timestamp'], datetime):
-                    record['formatted_timestamp'] = record['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
-                else:
-                    record['formatted_timestamp'] = 'N/A'
-                if 'audio_data' in record and isinstance(record['audio_data'], Binary):
-                    record['audio_data_b64'] = base64.b64encode(record['audio_data']).decode('utf-8')
-                    record['audio_data_url'] = f"data:{record.get('audio_mimetype', 'audio/wav')};base64,{record['audio_data_b64']}"
-                else:
-                    record['audio_data_url'] = ''
+@app.route('/static/partials/<path:filename>')
+def partial_html_files(filename):
+    """
+    Serves partial HTML files from the 'static/partials' directory.
+    """
+    return send_from_directory(os.path.join(app.static_folder, 'partials'), filename)
 
-        return render_template('results.html', last_prediction=last_prediction_result,
-                               user_name=session.get('user_id'), preferred_mode=session.get('preferred_mode'),
-                               user_audio_records=user_audio_records)
-    except Exception as e:
-        print(f"[{os.path.basename(__file__)}] ERROR: Exception during results rendering: {e}")
-        return "<h1>Server Error</h1><p>Could not load results page: " + str(e) + "</p><p>Check Flask terminal for details.</p>", 500
+@app.route('/favicon.ico')
+def favicon():
+    """
+    Serves the favicon.ico file.
+    """
+    return send_from_directory(app.static_folder, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
-@app.route('/account', methods=['GET'])
-def account():
-    """Renders the account page."""
-    if 'user_id' not in session:
-        flash(get_translated_text('please_login_view_account'), 'error') 
-        return redirect(url_for('login'))
-    
-    user_data = None
-    if users_collection is not None:
-        user_data = users_collection.find_one({'username': session['user_id']})
-    
-    return render_template('account.html', user_data=user_data,
-                           user_name=session.get('user_id'), preferred_mode=session.get('preferred_mode'))
-
-@app.route('/update_preferences', methods=['POST'])
-def update_preferences():
-    """Updates user preferences (preferred_mode and preferred_language) in the database."""
-    if 'user_id' not in session:
-        return jsonify({"success": False, "message": "Not logged in."}), 401
-    
-    if users_collection is None:
-        return jsonify({"success": False, "message": get_translated_text('database_not_available')}), 500
-
-    user_id = session['user_id']
+# API Endpoints for User Authentication and Analysis Data
+@app.route('/api/register', methods=['POST'])
+def register_user():
+    """
+    Handles user registration.
+    """
     data = request.get_json()
-    update_fields = {}
+    email = data.get('email')
+    password = data.get('password')
 
-    # Handle preferred_mode update
-    if 'preferred_mode' in data:
-        new_mode = data.get('preferred_mode')
-        if new_mode in ['light', 'dark']:
-            update_fields['preferred_mode'] = new_mode
-            session['preferred_mode'] = new_mode 
-        else:
-            return jsonify({"success": False, "message": "Invalid mode."}), 400
+    if not email or not password:
+        return jsonify({"message": "Email and password are required"}), 400
 
-    # Handle preferred_language update
-    if 'preferred_language' in data:
-        new_language = data.get('preferred_language')
-        if new_language in ['en', 'hi']:
-            update_fields['preferred_language'] = new_language
-            session['preferred_language'] = new_language
-        else:
-            return jsonify({"success": False, "message": "Invalid language."}), 400
+    if users_collection.find_one({"email": email}):
+        return jsonify({"message": "User with this email already exists"}), 409
 
-    if not update_fields:
-        return jsonify({"success": False, "message": "No preferences provided to update."}), 400
+    hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+    users_collection.insert_one({
+        "email": email,
+        "password_hash": hashed_password,
+        "created_at": datetime.utcnow()
+    })
+    return jsonify({"message": "Registration successful"}), 201
 
-    try:
-        users_collection.update_one({'username': user_id}, {'$set': update_fields})
-        return jsonify({"success": True, "message": "Preferences updated."})
-    except Exception as e:
-        print(f"[{os.path.basename(__file__)}] ERROR updating preferences for '{user_id}': {e}")
-        return jsonify({"success": False, "message": f"Failed to update preferences: {e}"}), 500
+@app.route('/api/login', methods=['POST'])
+def login_user():
+    """
+    Handles user login.
+    """
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
 
+    if not email or not password:
+        return jsonify({"message": "Email and password are required"}), 400
 
-@app.route('/login', methods=['GET']) 
-def login():
-    """Renders the login/registration page."""
-    try:
-        return render_template('login.html')
-    except Exception as e:
-        print(f"[{os.path.basename(__file__)}] ERROR: Exception during login rendering: {e}")
-        return "<h1>Server Error</h1><p>Could not load login page: " + str(e) + "</p>", 500
+    user = users_collection.find_one({"email": email})
+    if user and check_password_hash(user['password_hash'], password):
+        session['user_email'] = email
+        return jsonify({"message": "Login successful", "user_email": email}), 200
+    else:
+        return jsonify({"message": "Invalid email or password"}), 401
 
+@app.route('/api/logout', methods=['POST'])
+def logout_user():
+    """
+    Handles user logout.
+    """
+    session.pop('user_email', None)
+    return jsonify({"message": "Logout successful"}), 200
 
-@app.route('/login_submit', methods=['POST'])
-def login_submit():
-    """Handles login form submission."""
-    username = request.form.get('username')
-    password = request.form.get('password')
-    action = request.form.get('action') 
+@app.route('/api/current_user', methods=['GET'])
+def get_current_user():
+    """
+    Returns the email of the currently logged-in user.
+    """
 
-    if users_collection is None:
-        print(f"[{os.path.basename(__file__)}] ERROR: MongoDB connection not established or users_collection is None.")
-        flash(get_translated_text('database_not_available'), 'error') 
-        return redirect(url_for('login'))
+    if 'user_email' in session:
+        return jsonify({"user_email": session['user_email']}), 200
+    return jsonify({"user_email": None}), 200
 
-    if not username or not password:
-        flash(get_translated_text('username_password_required'), 'error') 
-        return redirect(url_for('login'))
-
-    try:
-        user_doc = users_collection.find_one({'username': username})
-
-        if action == 'register':
-            if user_doc:
-                flash(get_translated_text('username_exists'), 'error') 
-                return redirect(url_for('login'))
-            else:
-                hashed_password = generate_password_hash(password)
-                users_collection.insert_one({
-                    'username': username, 
-                    'password_hash': hashed_password,
-                    'preferred_mode': 'light', 
-                    'preferred_language': 'en',
-                    'created_at': datetime.now(),
-                    'last_login': datetime.now()
-                })
-                session['user_id'] = username
-                session['preferred_mode'] = 'light' 
-                session['preferred_language'] = 'en'
-                flash(get_translated_text('account_created_logged_in').format(username=username), 'success')
-                return redirect(url_for('home'))
-        
-        elif action == 'login':
-            if user_doc:
-                stored_hash = user_doc['password_hash']
-                if check_password_hash(stored_hash, password):
-                    session['user_id'] = username
-                    session['preferred_mode'] = user_doc.get('preferred_mode', 'light') 
-                    session['preferred_language'] = user_doc.get('preferred_language', 'en')
-                    users_collection.update_one({'username': username}, {'$set': {'last_login': datetime.now()}})
-                    flash(get_translated_text('welcome_back').format(username=username), 'success')
-                    return redirect(url_for('home'))
-                else:
-                    flash(get_translated_text('invalid_username_password'), 'error')
-                    return redirect(url_for('login'))
-            else:
-                flash(get_translated_text('username_not_found'), 'error')
-                return redirect(url_for('login'))
-        else:
-            flash(get_translated_text('invalid_action'), 'error')
-            return redirect(url_for('login'))
-
-    except Exception as e:
-        flash(f"{get_translated_text('an_error_occurred')}: {e}", 'error')
-        print(f"[{os.path.basename(__file__)}] ERROR during login/registration: {e}")
-        return redirect(url_for('login'))
-
-
-@app.route('/logout', methods=['POST'])
-def logout():
-    """Handles logout and clears session."""
-    session.pop('user_id', None)
-    session.pop('preferred_mode', None)
-    session.pop('preferred_language', None)
-    flash(get_translated_text('logged_out_successfully'), 'info') 
-    return redirect(url_for('login'))
-
-@app.route('/predict', methods=['POST'])
-def predict():
-    """Handles audio prediction requests."""
-    global last_prediction_result 
-
-    user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({"error": get_translated_text('user_not_authenticated')}), 401
+# --- Modified /api/analysis route to use local model ---
+@app.route('/api/analysis', methods=['POST'])
+def analyze_voice_api():
+    if 'user_email' not in session:
+        return jsonify({"message": "Unauthorized"}), 401
 
     if 'audio' not in request.files:
-        return jsonify({"error": get_translated_text('no_audio_file_provided')}), 400
+        return jsonify({'error': 'No audio file provided'}), 400
 
-    audio_file_stream = request.files['audio']
-    
-    audio_bytes = audio_file_stream.read()
-    audio_file_stream.seek(0) 
+    audio_file = request.files['audio']
+    if audio_file.filename == '':
+        return jsonify({'error': 'No selected audio file'}), 400
+
+    # Model is loaded once at startup via @app.before_request.
+    global global_spoofing_model
+    if global_spoofing_model is None:
+        print("Error: global_spoofing_model is None during analysis request. Model was not loaded at startup.")
+        return jsonify({'error': 'Voice spoofing model not loaded. Please check server logs.'}), 500
+
+    # Save the audio file temporarily
+    unique_filename = str(uuid.uuid4()) + os.path.splitext(audio_file.filename)[1]
+    audio_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+    audio_file.save(audio_path)
+    print(f"Processing audio file: {audio_file.filename} saved to {audio_path}") # More detailed log
 
     try:
-        if audio_file_stream.mimetype == 'audio/webm' or audio_file_stream.mimetype == 'audio/webm;codecs=opus':
-            audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes), format="webm")
-            wav_io = io.BytesIO()
-            audio_segment.export(wav_io, format="wav")
-            wav_io.seek(0)
-            audio_bytes_processed = wav_io.read()
-        else:
-            audio_bytes_processed = audio_bytes
+        # Preprocess audio for the model
+        features = preprocess_audio_for_model(audio_path)
+        if features is None:
+            print(f"Error: Failed to preprocess audio for analysis for {audio_file.filename}.")
+            return jsonify({'error': 'Failed to preprocess audio for analysis'}), 500
 
-        audio_data, original_sr = librosa.load(io.BytesIO(audio_bytes_processed), sr=None, mono=True)
+        # Perform prediction using the loaded Keras model
+        # The model outputs probabilities for each class (spoofed, genuine)
+        predictions = global_spoofing_model.predict(features, verbose=0)[0]
+        print(f"Raw predictions for {audio_file.filename}: Spoofed={predictions[0]:.4f}, Genuine={predictions[1]:.4f}") # Added for debugging
         
-        if audio_data is None or len(audio_data) == 0:
-            print(f"[{os.path.basename(__file__)}] ERROR: librosa.load returned empty audio_data or None.")
-            return jsonify({"error": get_translated_text('failed_load_audio_empty')}), 400
+        # In your notebook, 0 is 'spoofed' and 1 is 'bonafide' (genuine)
+        spoofed_confidence = predictions[0]
+        genuine_confidence = predictions[1]
 
-        processed_features = preprocess_audio(audio_data, original_sr)
-
-        if processed_features is None:
-            print(f"[{os.path.basename(__file__)}] Predict error: Failed to preprocess audio (e.g., audio too short or silent).")
-            return jsonify({"error": get_translated_text('failed_preprocess_audio')}), 400
-
-        verdict_current_lang, verdict_en, confidence_breakdown = predict_with_cnn(processed_features)
-
-        last_prediction_result['verdict'] = verdict_current_lang
-        last_prediction_result['confidence'] = confidence_breakdown
-
-        if audio_records_collection is not None:
-            audio_record = {
-                'user_id': user_id,
-                'timestamp': datetime.now(),
-                'audio_data': Binary(audio_bytes), 
-                'audio_filename': audio_file_stream.filename, 
-                'audio_mimetype': audio_file_stream.mimetype, 
-                'verdict_en': verdict_en, 
-                'verdict_current_lang': verdict_current_lang, 
-                'confidence': confidence_breakdown
-            }
-            audio_records_collection.insert_one(audio_record)
+        # --- Decision logic: classify based on higher confidence ---
+        if genuine_confidence > spoofed_confidence:
+            result_type = "genuine"
+            confidence = genuine_confidence
+            message = "The voice is likely genuine."
+            color = "green"
         else:
-            print(f"[{os.path.basename(__file__)}] WARNING: Audio record not saved. MongoDB audio_records_collection not available.")
+            result_type = "spoofed"
+            confidence = spoofed_confidence
+            message = "WARNING: The voice is likely AI-spoofed!"
+            color = "red"
 
-        return jsonify({
-            "verdict": verdict_current_lang,
-            "verdict_en": verdict_en,
-            "confidence": confidence_breakdown,
-            "redirect_to": url_for('thank_you') 
+        response_data = {
+            'result': result_type,
+            'confidence': round(float(confidence * 100), 2), # Convert to percentage and then to standard float
+            'isSpoofed': (result_type == "spoofed"), # Explicitly add for history
+            'message': message,
+            'color': color
+        }
+        print(f"Analysis result for {audio_file.filename}: {response_data}") # More detailed log
+
+        # Save to history if logged in
+        from datetime import datetime
+        analyses_collection.insert_one({
+            "user_email": session['user_email'],
+            "fileName": audio_file.filename,
+            "isSpoofed": (result_type == "spoofed"), # Store boolean
+            "confidence": response_data['confidence'], # This is now a standard Python float
+            "timestamp": datetime.utcnow()
         })
-    except Exception as e:
-        print(f"[{os.path.basename(__file__)}] Predict route ERROR during audio processing: {type(e).__name__}: {e}")
-        return jsonify({"error": f"{get_translated_text('audio_processing_failed')}: {e}"}), 500
+        print(f"Analysis saved to history for user: {session['user_email']} for file {audio_file.filename}")
 
-@app.route('/thank_you')
-def thank_you():
-    """Renders the thank you page after a prediction."""
-    try:
-        return render_template('thank_you.html', last_prediction=last_prediction_result,
-                               user_name=session.get('user_id'), preferred_mode=session.get('preferred_mode'))
+        return jsonify(response_data)
+
     except Exception as e:
-        print(f"[{os.path.basename(__file__)}] ERROR: Exception during thank_you rendering: {e}")
-        return "<h1>Server Error</h1><p>Could not load thank you page: " + str(e) + "</p><p>Check Flask terminal for details.</p>", 500
+        print(f"Unhandled error during voice analysis for {audio_file.filename}: {e}")
+        return jsonify({'error': f'An unexpected error occurred during analysis: {e}'}), 500
+    finally:
+        # Clean up the temporary audio file
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
+            print(f"Temporary audio file removed: {audio_path}")
+
+@app.route('/api/analyses', methods=['GET'])
+def get_analyses():
+    """
+    Retrieves all analysis results for the current user.
+    """
+    if 'user_email' not in session:
+        return jsonify({"message": "Unauthorized"}), 401
+
+    user_analyses = list(analyses_collection.find({"user_email": session['user_email']}).sort("timestamp", -1))
+    # Convert ObjectId to string for JSON serialization
+    for analysis in user_analyses:
+        analysis['_id'] = str(analysis['_id'])
+        # Ensure datetime objects are serialized correctly
+        if 'timestamp' in analysis and isinstance(analysis['timestamp'], datetime):
+            analysis['timestamp'] = analysis['timestamp'].isoformat()
+    return jsonify({"analyses": user_analyses}), 200
+
+# --- Modified /api/news endpoint to use NewsAPI.org ---
+NEWS_API_KEY = os.environ.get('NEWS_API_KEY', '4004719a0aa54f07868c82c0aabc8e88') # Your actual NewsAPI.org key
+NEWS_API_URL = "https://newsapi.org/v2/everything"
+
+@app.route('/api/news', methods=['GET'])
+def get_news():
+    """
+    Fetches news articles related to voice spoofing from NewsAPI.org.
+    Falls back to mock data if API call fails.
+    """
+    # Mock data to be used as a fallback
+    mock_news_articles = [
+        {
+            "id": 1,
+            "title": "New AI Voice Spoofing Attacks Target Financial Institutions",
+            "description": "Recent reports indicate a surge in sophisticated AI-generated voice attacks aimed at defrauding customers of major banks.",
+            "url": "https://example.com/news/article1",
+            "source": "CyberSecurity Today",
+            "publishedAt": "2024-07-01T10:00:00Z"
+        },
+        {
+            "id": 2,
+            "title": "How Deepfake Voices Are Being Used in Phishing Scams",
+            "description": "An in-depth look at the techniques criminals use to create convincing deepfake voices for social engineering and phishing.",
+            "url": "https://example.com/news/article2",
+            "source": "Tech Insights",
+            "publishedAt": "2024-06-28T14:30:00Z"
+        },
+        {
+            "id": 3,
+            "title": "Voice Biometrics vs. AI Spoofing: The Ongoing Battle",
+            "description": "Experts discuss the evolving cat-and-mouse game between voice biometric security systems and advanced AI voice synthesis.",
+            "url": "https://example.com/news/article3",
+            "source": "Security Weekly",
+            "publishedAt": "2024-06-25T09:15:00Z"
+        },
+        {
+            "id": 4,
+            "title": "Detecting Synthetic Speech: New Research Breakthroughs",
+            "description": "Researchers announce significant progress in developing algorithms capable of identifying subtle artifacts in AI-generated speech.",
+            "url": "https://example.com/news/article4",
+            "source": "AI Journal",
+            "publishedAt": "2024-06-20T11:00:00Z"
+        },
+        {
+            "id": 5,
+            "title": "The Ethical Implications of Voice Cloning Technology",
+            "description": "A discussion on the societal and ethical challenges posed by readily available voice cloning tools and their potential for misuse.",
+            "url": "https://example.com/news/article5",
+            "source": "Ethics in AI",
+            "publishedAt": "2024-06-15T16:00:00Z"
+        }
+    ]
+
+    # Check if API key is configured. If not, return mock data immediately.
+    if not NEWS_API_KEY or NEWS_API_KEY == 'YOUR_NEWSAPI_API_KEY':
+        print("NEWS_API_KEY is not set or is a placeholder. Returning mock news data.")
+        return jsonify({"articles": mock_news_articles, "message": "API key not configured, returning mock data."}), 200
+
+    params = {
+        # Refined query for more specific results:
+        # Requires one of the core voice spoofing phrases AND one of the contextual keywords.
+        'q': '("voice spoofing" OR "deepfake voice" OR "synthetic voice detection" OR "AI voice fraud" OR "audio deepfake" OR "anti-spoofing audio") AND (cybersecurity OR fraud OR attack OR threat OR security OR news OR research)',
+        'language': 'en',
+        'sortBy': 'relevancy', 
+        'apiKey': NEWS_API_KEY,
+        'pageSize': 5 # Fetch 5 articles
+    }
+
+    try:
+        response = requests.get(NEWS_API_URL, params=params)
+        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+        news_data = response.json()
+        
+        articles = []
+        if news_data.get('articles'):
+            for i, article in enumerate(news_data['articles']):
+                articles.append({
+                    "id": i + 1,
+                    "title": article.get('title'),
+                    "description": article.get('description'),
+                    "url": article.get('url'),
+                    "source": article['source'].get('name') if article.get('source') else 'Unknown',
+                    "publishedAt": article.get('publishedAt')
+                })
+        print(f"Fetched {len(articles)} articles from NewsAPI.org.")
+        return jsonify({"articles": articles}), 200
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching news from NewsAPI: {e}")
+        # Fallback to mock data on API error
+        return jsonify({"articles": mock_news_articles, "error": f"Failed to fetch news from API: {e}. Returning mock data."}), 500
 
 
 if __name__ == '__main__':
-    if not os.path.exists(MODEL_DIR):
-        os.makedirs(MODEL_DIR)
-    
-    app.run(debug=True, port=5001)
+    # Try to load the model at startup
+    load_spoofing_model()
+    # Ensure UPLOAD_FOLDER exists
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
