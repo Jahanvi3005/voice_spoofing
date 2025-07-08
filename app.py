@@ -5,9 +5,8 @@ from pymongo import MongoClient
 import uuid # For unique filenames
 import librosa # For audio processing
 import numpy as np # For numerical operations
-import soundfile as sf # For saving audio data
 import tensorflow as tf # For loading and using the Keras model
-from tensorflow.keras.models import load_model # Specific import for loading
+from tensorflow.keras.models import load_model # Specific import for loading a *trained* model
 from werkzeug.security import generate_password_hash, check_password_hash # For password hashing
 from datetime import datetime # For timestamps in analysis history
 
@@ -29,14 +28,27 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/')
 MONGO_DB_NAME = os.environ.get('MONGO_DB_NAME', 'voice_spoofing_db')
 
-client = MongoClient(MONGO_URI)
-db = client[MONGO_DB_NAME]
+# Initialize MongoDB client and collections
+client = None
+db = None
+users_collection = None
+analyses_collection = None
 
-# Collections
-users_collection = db.users
-analyses_collection = db.analyses
+try:
+    client = MongoClient(MONGO_URI)
+    
+    client.admin.command('ping')
+    db = client[MONGO_DB_NAME]
+    users_collection = db.users
+    analyses_collection = db.analyses
+    print("Successfully connected to MongoDB!")
+except Exception as e:
+    print(f"CRITICAL ERROR: Could not connect to MongoDB: {e}")
+    print("Please check your MONGO_URI environment variable, database user credentials, and IP whitelist in MongoDB Atlas.")
+    # In a production app, you might want to exit or handle this more gracefully
+    # For now, we'll let the app continue but it will fail on DB operations.
 
-# Model and audio processing constants (from ntcc-model-code.ipynb)
+# Model and audio processing constants
 SAMPLE_RATE = 16000      # 16 kHz audio
 CLIP_LENGTH = 5          # seconds per file
 N_MELS = 128             # Mel spectrogram feature size
@@ -44,11 +56,13 @@ MAX_T = 501              # Expected time dimension of Mel spectrogram for 5-seco
 N_FFT = 400              # FFT window size
 HOP_LENGTH = 160         # Hop length for spectrogram calculation
 
-# Path to your pre-trained Keras model (from ntcc-model-code.ipynb)
+# Path to  model 
 MODEL_SAVE_PATH = 'audio_spoof_model_improved_regularized_final.h5'
 
 # Global variable for the local model
 global_spoofing_model = None
+
+
 
 def load_spoofing_model():
     """
@@ -131,7 +145,7 @@ def preprocess_audio_for_model(audio_path):
         print(f"Error processing audio for model: {e}")
         return None
 
-# --- Routes ---
+# Routes 
 
 @app.before_request
 def before_request():
@@ -175,6 +189,9 @@ def register_user():
     """
     Handles user registration.
     """
+    if users_collection is None:
+        return jsonify({"message": "Database not connected"}), 500
+
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -198,6 +215,9 @@ def login_user():
     """
     Handles user login.
     """
+    if users_collection is None:
+        return jsonify({"message": "Database not connected"}), 500
+
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -230,11 +250,14 @@ def get_current_user():
         return jsonify({"user_email": session['user_email']}), 200
     return jsonify({"user_email": None}), 200
 
-# --- Modified /api/analysis route to use local model ---
+#  /api/analysis route to use local model 
 @app.route('/api/analysis', methods=['POST'])
 def analyze_voice_api():
     if 'user_email' not in session:
         return jsonify({"message": "Unauthorized"}), 401
+    
+    if analyses_collection is None:
+        return jsonify({"message": "Database not connected"}), 500
 
     if 'audio' not in request.files:
         return jsonify({'error': 'No audio file provided'}), 400
@@ -253,7 +276,7 @@ def analyze_voice_api():
     unique_filename = str(uuid.uuid4()) + os.path.splitext(audio_file.filename)[1]
     audio_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
     audio_file.save(audio_path)
-    print(f"Processing audio file: {audio_file.filename} saved to {audio_path}") # More detailed log
+    print(f"Processing audio file: {audio_file.filename} saved to {audio_path}") 
 
     try:
         # Preprocess audio for the model
@@ -263,25 +286,29 @@ def analyze_voice_api():
             return jsonify({'error': 'Failed to preprocess audio for analysis'}), 500
 
         # Perform prediction using the loaded Keras model
-        # The model outputs probabilities for each class (spoofed, genuine)
+        # The model outputs probabilities for each class 
         predictions = global_spoofing_model.predict(features, verbose=0)[0]
-        print(f"Raw predictions for {audio_file.filename}: Spoofed={predictions[0]:.4f}, Genuine={predictions[1]:.4f}") # Added for debugging
         
-        # In your notebook, 0 is 'spoofed' and 1 is 'bonafide' (genuine)
+        # label = 0 for 'spoofed' and 1 for 'bonafide' (genuine)
+        
         spoofed_confidence = predictions[0]
         genuine_confidence = predictions[1]
 
-        # --- Decision logic: classify based on higher confidence ---
+        print(f"Raw predictions for {audio_file.filename}: Spoofed={spoofed_confidence:.4f}, Genuine={genuine_confidence:.4f}") # Updated for debugging
+        
+        # Decision logic 
+        # Classify based on which confidence is higher
         if genuine_confidence > spoofed_confidence:
             result_type = "genuine"
             confidence = genuine_confidence
             message = "The voice is likely genuine."
             color = "green"
-        else:
+        else: # spoofed_confidence >= genuine_confidence
             result_type = "spoofed"
             confidence = spoofed_confidence
             message = "WARNING: The voice is likely AI-spoofed!"
             color = "red"
+
 
         response_data = {
             'result': result_type,
@@ -290,7 +317,7 @@ def analyze_voice_api():
             'message': message,
             'color': color
         }
-        print(f"Analysis result for {audio_file.filename}: {response_data}") # More detailed log
+        print(f"Analysis result for {audio_file.filename}: {response_data}") 
 
         # Save to history if logged in
         from datetime import datetime
@@ -310,9 +337,17 @@ def analyze_voice_api():
         return jsonify({'error': f'An unexpected error occurred during analysis: {e}'}), 500
     finally:
         # Clean up the temporary audio file
+        print(f"Attempting to remove temporary audio file: {audio_path}")
         if os.path.exists(audio_path):
-            os.remove(audio_path)
-            print(f"Temporary audio file removed: {audio_path}")
+            try:
+                os.remove(audio_path)
+                print(f"Temporary audio file removed successfully: {audio_path}")
+            except OSError as e:
+                print(f"ERROR: Could not remove temporary audio file {audio_path}: {e}")
+                print("This might be due to file permissions or the file being locked.")
+        else:
+            print(f"Temporary audio file not found at path: {audio_path}. Already removed or never created?")
+
 
 @app.route('/api/analyses', methods=['GET'])
 def get_analyses():
@@ -321,6 +356,9 @@ def get_analyses():
     """
     if 'user_email' not in session:
         return jsonify({"message": "Unauthorized"}), 401
+    
+    if analyses_collection is None:
+        return jsonify({"message": "Database not connected"}), 500
 
     user_analyses = list(analyses_collection.find({"user_email": session['user_email']}).sort("timestamp", -1))
     # Convert ObjectId to string for JSON serialization
@@ -331,7 +369,7 @@ def get_analyses():
             analysis['timestamp'] = analysis['timestamp'].isoformat()
     return jsonify({"analyses": user_analyses}), 200
 
-# --- Modified /api/news endpoint to use NewsAPI.org ---
+# /api/news endpoint 
 NEWS_API_KEY = os.environ.get('NEWS_API_KEY', '4004719a0aa54f07868c82c0aabc8e88') # Your actual NewsAPI.org key
 NEWS_API_URL = "https://newsapi.org/v2/everything"
 
@@ -391,18 +429,17 @@ def get_news():
         return jsonify({"articles": mock_news_articles, "message": "API key not configured, returning mock data."}), 200
 
     params = {
-        # Refined query for more specific results:
-        # Requires one of the core voice spoofing phrases AND one of the contextual keywords.
-        'q': '("voice spoofing" OR "deepfake voice" OR "synthetic voice detection" OR "AI voice fraud" OR "audio deepfake" OR "anti-spoofing audio") AND (cybersecurity OR fraud OR attack OR threat OR security OR news OR research)',
+        
+        'q': '("voice spoofing" OR "deepfake voice" OR "synthetic voice detection" )',
         'language': 'en',
         'sortBy': 'relevancy', 
         'apiKey': NEWS_API_KEY,
-        'pageSize': 5 # Fetch 5 articles
+        'pageSize': 5
     }
 
     try:
         response = requests.get(NEWS_API_URL, params=params)
-        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+        response.raise_for_status() 
         news_data = response.json()
         
         articles = []
@@ -428,7 +465,7 @@ def get_news():
 if __name__ == '__main__':
     # Try to load the model at startup
     load_spoofing_model()
-    # Ensure UPLOAD_FOLDER exists
+   
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))

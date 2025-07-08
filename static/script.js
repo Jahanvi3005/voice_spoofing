@@ -32,21 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- Navbar Toggle for Mobile ---
-    const navbarToggleBtn = document.getElementById('navbar-toggle-btn');
-    const navbarLinks = document.getElementById('navbar-links');
-
-    if (navbarToggleBtn && navbarLinks) {
-        navbarToggleBtn.addEventListener('click', () => {
-            console.log('Navbar Toggle Button Clicked.');
-            navbarLinks.classList.toggle('hidden');
-            navbarLinks.classList.toggle('flex'); // Ensure it becomes flex when active
-        });
-    } else {
-        console.warn('Warning: Navbar toggle elements not found (navbarToggleBtn or navbarLinks).');
-    }
-
-    // --- Smooth Scrolling for Navigation Links ---
+    // Smooth Scrolling for Navigation Links 
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
             e.preventDefault();
@@ -56,14 +42,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 behavior: 'smooth'
             });
             // Close mobile nav after clicking a link
-            if (navbarLinks && !navbarLinks.classList.contains('hidden')) {
-                navbarLinks.classList.add('hidden');
-                navbarLinks.classList.remove('flex');
+            if (navbarLinks && navbarLinks.classList.contains('active')) {
+                navbarLinks.classList.remove('active'); // Close mobile nav
             }
         });
     });
 
-    // --- Scroll Progress Bar ---
+    //  Scroll Progress Bar 
     const scrollProgressBar = document.getElementById('scroll-progress-bar');
     if (scrollProgressBar) {
         window.addEventListener('scroll', () => {
@@ -75,25 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Warning: Scroll progress bar element not found.');
     }
 
-    // --- Theme Toggle ---
-    const themeToggleBtn = document.getElementById('theme-toggle');
-    if (themeToggleBtn) {
-        themeToggleBtn.addEventListener('click', () => {
-            console.log('Theme Toggle Button Clicked.');
-            document.body.classList.toggle('dark-mode');
-            // Save theme preference to localStorage
-            if (document.body.classList.contains('dark-mode')) {
-                localStorage.setItem('theme', 'dark');
-            } else {
-                localStorage.setItem('theme', 'light');
-            }
-            // Re-embed Twitter timeline to update its theme
-            // embedTwitterTimeline(); // Removed as Twitter feed is replaced by news
-        });
-    } else {
-        console.warn('Warning: Theme toggle button not found.');
-    }
-
+    
     // Apply saved theme preference on load
     if (localStorage.getItem('theme') === 'dark') {
         document.body.classList.add('dark-mode');
@@ -101,7 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('dark-mode');
     }
 
-    // --- Message Box Utility ---
+
+    // Message Box Utility 
     function showMessageBox(message, type = 'info', duration = 3000) {
         const messageBox = document.getElementById('message-box');
         if (!messageBox) {
@@ -142,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.showMessageBox = showMessageBox; // Make it globally accessible
 
-    // --- Copy Email to Clipboard ---
+    //  Copy Email to Clipboard
     const copyEmailBtn = document.getElementById('copy-email-btn');
     const contactEmailSpan = document.getElementById('contact-email');
 
@@ -162,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Warning: Copy email button or contact email span not found.');
     }
 
-    // --- Dynamic Loading of Partials (Login Modal) ---
+    // Dynamic Loading of Partials (Login Modal) 
     async function loadPartial(placeholderId, partialPath) {
         const placeholder = document.getElementById(placeholderId);
         if (placeholder) {
@@ -198,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // --- Login/Registration Modal Logic ---
+    //  Login/Registration Modal Logic 
     function initLoginModal() {
         const loginModal = document.getElementById('login-modal');
         const closeLoginModalBtn = document.getElementById('close-login-modal-btn');
@@ -354,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- User Login Status Check and Display ---
+    // User Login Status Check and Display 
     async function checkUserLoginStatus() {
         console.log('Checking user login status...');
         try {
@@ -376,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (userIdDisplay) userIdDisplay.textContent = '';
                 const analysisHistoryList = document.getElementById('analysis-history-list');
                 if (analysisHistoryList) {
-                    analysisHistoryList.innerHTML = '<li class="text-center text-gray-500 dark:text-gray-400">Log in to view your analysis history.</li>';
+                    analysisHistoryList.innerHTML = '<li class="text-center text-gray-500">Log in to view your analysis history.</li>';
                 }
                 console.log('User is not logged in.');
             }
@@ -420,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- Voice Analysis Section Logic ---
+    // Voice Analysis Section Logic
     const audioFileInput = document.getElementById('audio-file-input');
     const fileNameDisplay = document.getElementById('file-name-display');
     const fileStatusContainer = document.getElementById('file-status-container');
@@ -434,6 +402,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let selectedAudioFile = null; // To store the file object
     let recordedAudioBlob = null; // To store recorded audio blob
+
+    // Function to clear all audio input states (file upload and recording)
+    function clearAudioInput() {
+        console.log('Clearing audio input states...');
+        // Clear uploaded file state
+        if (audioFileInput) audioFileInput.value = '';
+        selectedAudioFile = null;
+        if (fileNameDisplay) fileNameDisplay.textContent = '';
+        if (fileStatusContainer) fileStatusContainer.classList.add('hidden');
+
+        // Clear recorded audio state
+        recordedAudioBlob = null;
+        if (audioPlayback) audioPlayback.src = '';
+        if (audioPlayback) audioPlayback.classList.add('hidden');
+        if (recordAudioBtn) recordAudioBtn.textContent = 'Start Recording';
+        if (recordingStatus) recordingStatus.classList.add('hidden');
+        if (playRecordingBtn) playRecordingBtn.classList.add('hidden');
+        if (downloadRecordingBtn) downloadRecordingBtn.classList.add('hidden');
+        if (clearRecordingBtn) clearRecordingBtn.classList.add('hidden');
+        
+        updateAnalyzeButtonState();
+        console.log('Audio input states cleared.');
+    }
+
 
     // Enable/disable analyze button based on file selection/recording
     function updateAnalyzeButtonState() {
@@ -479,6 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (recordAudioBtn) recordAudioBtn.textContent = 'Start Recording';
                 if (recordingStatus) recordingStatus.classList.add('hidden');
                 if (playRecordingBtn) playRecordingBtn.classList.add('hidden');
+                if (downloadRecordingBtn) downloadRecordingBtn.classList.add('hidden');
                 if (clearRecordingBtn) clearRecordingBtn.classList.add('hidden');
                 
                 console.log('Audio file selected:', selectedAudioFile.name);
@@ -496,21 +489,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (clearFileBtn) {
         clearFileBtn.addEventListener('click', () => {
-            if (audioFileInput) audioFileInput.value = '';
-            selectedAudioFile = null;
-            if (fileNameDisplay) fileNameDisplay.textContent = '';
-            if (fileStatusContainer) fileStatusContainer.classList.add('hidden');
-            updateAnalyzeButtonState();
+            clearAudioInput(); // Use the new comprehensive clear function
             console.log('File selection cleared by button.');
         });
     } else {
         console.warn('Warning: Clear file button not found.');
     }
 
-    // --- Audio Recording Logic ---
+    // Audio Recording Logic
     const recordAudioBtn = document.getElementById('record-audio-btn');
     const stopRecordingBtn = document.getElementById('stop-recording-btn');
     const playRecordingBtn = document.getElementById('play-recording-btn');
+    const downloadRecordingBtn = document.getElementById('download-recording-btn');
     const clearRecordingBtn = document.getElementById('clear-recording-btn');
     const recordingStatus = document.getElementById('recording-status');
     const recordingTimer = document.getElementById('recording-timer');
@@ -566,6 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (audioPlayback) audioPlayback.src = audioUrl;
                     if (audioPlayback) audioPlayback.classList.remove('hidden');
                     if (playRecordingBtn) playRecordingBtn.classList.remove('hidden');
+                    if (downloadRecordingBtn) downloadRecordingBtn.classList.remove('hidden');
                     if (clearRecordingBtn) clearRecordingBtn.classList.remove('hidden');
                     updateAnalyzeButtonState();
                     // Stop all tracks in the stream
@@ -580,6 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (stopRecordingBtn) stopRecordingBtn.classList.remove('hidden');
                 if (playRecordingBtn) playRecordingBtn.classList.add('hidden');
+                if (downloadRecordingBtn) downloadRecordingBtn.classList.add('hidden'); // Hide download button during recording
                 if (clearRecordingBtn) clearRecordingBtn.classList.add('hidden');
                 if (recordingStatus) recordingStatus.classList.remove('hidden');
                 startTimer();
@@ -627,14 +619,11 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Warning: Play recording button not found.');
     }
 
+    
+
     if (clearRecordingBtn) {
         clearRecordingBtn.addEventListener('click', () => {
-            recordedAudioBlob = null;
-            if (audioPlayback) audioPlayback.src = '';
-            if (audioPlayback) audioPlayback.classList.add('hidden');
-            if (playRecordingBtn) playRecordingBtn.classList.add('hidden');
-            if (clearRecordingBtn) clearRecordingBtn.classList.add('hidden');
-            updateAnalyzeButtonState();
+            clearAudioInput(); // Use the new comprehensive clear function
             showMessageBox('Recording cleared.', 'info');
             console.log('Recorded audio cleared.');
         });
@@ -642,7 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Warning: Clear recording button not found.');
     }
 
-    // --- Analyze Voice Button Click ---
+    // Analyze Voice Button Click 
     if (analyzeVoiceBtn) {
         analyzeVoiceBtn.addEventListener('click', async () => {
             let audioToAnalyze = null;
@@ -688,11 +677,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Set text color based on result
                     if (resultText) {
                         if (data.result === 'spoofed') {
-                            resultText.classList.remove('text-green-600');
-                            resultText.classList.add('text-red-600');
+                            resultText.classList.remove('text-green-600', 'dark:text-green-300');
+                            resultText.classList.add('text-red-600', 'dark:text-red-300');
                         } else {
-                            resultText.classList.remove('text-red-600');
-                            resultText.classList.add('text-green-600');
+                            resultText.classList.remove('text-red-600', 'dark:text-red-300');
+                            resultText.classList.add('text-green-600', 'dark:text-green-300');
                         }
                     }
 
@@ -712,17 +701,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 showMessageBox('An error occurred during analysis. Please try again.', 'error');
             } finally {
                 if (analysisLoadingSpinner) analysisLoadingSpinner.classList.add('hidden');
-                if (analyzeVoiceBtn) {
-                    analyzeVoiceBtn.disabled = false;
-                    analyzeVoiceBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                }
+                // Always clear the input after analysis attempt
+                clearAudioInput();
             }
         });
     } else {
         console.warn('Warning: Analyze voice button not found.');
     }
 
-    // --- Chart.js Initialization and Update ---
+    // Chart.js Initialization and update
     let spoofingChartInstance;
 
     function updateSpoofingChart(confidence, resultType) {
@@ -756,7 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
             plugins: {
                 legend: {
                     labels: {
-                        color: document.body.classList.contains('dark-mode') ? '#e0e0e0' : '#333333'
+                        color: document.body.classList.contains('dark-mode') ? '#e0e0e0' : '#333'
                     }
                 },
                 tooltip: {
@@ -791,7 +778,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Analysis History Fetching ---
+    // Analysis History Fetching 
     async function fetchAnalysisHistory() {
         const analysisHistoryList = document.getElementById('analysis-history-list');
         if (!analysisHistoryList) {
@@ -813,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         listItem.classList.add(analysis.isSpoofed ? 'bg-red-100 dark:bg-red-900' : 'bg-green-100 dark:bg-green-900');
                         listItem.innerHTML = `
                             <span class="font-medium text-gray-800 dark:text-gray-200">${analysis.fileName}</span>
-                            <span class="text-sm ${analysis.isSpoofed ? 'text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'}">
+                            <span class="text-sm ${analysis.isSpoofed ? 'text-red-600 dark:text-red-300' : 'text-green-600 dark:text-green-300'}">
                                 ${analysis.isSpoofed ? 'Spoofed' : 'Genuine'} (${analysis.confidence}%)
                             </span>
                             <span class="text-xs text-gray-500 dark:text-gray-400">${new Date(analysis.timestamp).toLocaleString()}</span>
@@ -826,17 +813,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('No analysis history found.');
                 }
             } else {
-                analysisHistoryList.innerHTML = `<li class="text-center text-red-500 dark:text-red-400">${data.message || 'Failed to load history.'}</li>`;
+                analysisHistoryList.innerHTML = `<li class="text-center text-red-600 dark:text-red-400">${data.message || 'Failed to load history.'}</li>`;
                 console.error('Failed to load analysis history:', data.message);
             }
         } catch (error) {
             console.error('Error fetching analysis history:', error);
-            analysisHistoryList.innerHTML = '<li class="text-center text-red-500 dark:text-red-400">Error loading history.</li>';
+            analysisHistoryList.innerHTML = '<li class="text-center text-red-600 dark:text-red-400">Error loading history.</li>';
             showMessageBox('Error loading analysis history.', 'error');
         }
     }
 
-    // --- News Fetching Logic (Reverted from Twitter Embed) ---
+    //  News Fetching Logic 
     async function fetchNews() {
         const newsContainer = document.getElementById('news-articles-container');
         if (!newsContainer) {
@@ -855,10 +842,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 newsContainer.innerHTML = ''; // Clear loading message
                 data.articles.forEach(article => {
                     const articleElement = document.createElement('div');
-                    articleElement.className = 'w-full max-w-2xl mx-auto p-4 transition-all duration-300 transform hover:scale-105';
+                    
+                    articleElement.className = 'w-full max-w-2xl mx-auto mb-6 pb-4 border-b border-gray-200 dark:border-gray-700';
                     articleElement.innerHTML = `
-                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">${article.title}</h3>
-                        <p class="text-gray-700 dark:text-gray-300 text-sm mb-3">${article.description}</p>
+                        <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">${article.title}</h3>
+                        <p class="text-gray-600 dark:text-gray-300 text-sm mb-3">${article.description}</p>
                         <a href="${article.url}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline text-sm font-medium">Read More &rarr;</a>
                         ${article.source ? `<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Source: ${article.source}</p>` : ''}
                         ${article.publishedAt ? `<p class="text-xs text-gray-500 dark:text-gray-400">Published: ${new Date(article.publishedAt).toLocaleDateString()}</p>` : ''}
@@ -867,38 +855,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 console.log(`Loaded ${data.articles.length} news articles.`);
             } else {
-                newsContainer.innerHTML = '<p class="text-center text-red-500 dark:text-red-400">Failed to load news. Please try again later.</p>';
+                newsContainer.innerHTML = '<p class="text-center text-red-600 dark:text-red-400">Failed to load news. Please try again later.</p>';
                 console.error('Error fetching news:', data.message || 'Unknown error');
                 showMessageBox('Failed to load news.', 'error');
             }
         } catch (error) {
             console.error('Fetch error during news retrieval:', error);
-            newsContainer.innerHTML = '<p class="text-center text-red-500 dark:text-red-400">An error occurred while fetching news.</p>';
+            newsContainer.innerHTML = '<p class="text-center text-red-600 dark:text-red-400">An error occurred while fetching news.</p>';
             showMessageBox('An error occurred while fetching news.', 'error');
         }
     }
 
-    // --- News Toggle Button Logic (Reverted to News Section) ---
-    const newsToggleBtn = document.getElementById('news-toggle-btn');
-    if (newsToggleBtn) {
-        newsToggleBtn.addEventListener('click', () => {
-            console.log('News Toggle Button Clicked (for Latest News).');
-            // Smooth scroll to the news section
-            const newsSection = document.getElementById('news');
-            if (newsSection) {
-                newsSection.scrollIntoView({
-                    behavior: 'smooth'
-                });
-                console.log('Scrolled to news section.');
-            } else {
-                console.warn('Warning: News section element not found for scrolling.');
-            }
-        });
-    } else {
-        console.warn('Warning: News toggle button not found.');
-    }
+    
 
-    // --- FAQ Accordion Logic ---
+    // FAQ Accordion Logic 
     function initFaqAccordion() {
         const faqItems = document.querySelectorAll('.faq-item');
 
@@ -928,7 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- Initializations on DOMContentLoaded ---
+    //Initializations on DOMContentLoaded 
     updateAnalyzeButtonState(); // Set initial state of analyze button
     fetchNews(); // Fetch news when the page loads
     initFaqAccordion(); // Initialize FAQ accordion

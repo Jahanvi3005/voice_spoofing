@@ -122,7 +122,8 @@
     <!-- Scroll Progress Bar -->
     <div id="scroll-progress-bar"></div>
 
-    <!-- Top Navbar -->
+    
+     <!-- Top Navbar -->
     <nav id="main-navbar" class="fixed top-0 left-0 right-0 z-50 bg-black dark:bg-black transition-colors duration-300">
         <div class="container mx-auto px-4 py-4 flex justify-between items-center transition-colors duration-300">
             <!-- Left side: Logo/Title and Hamburger for Mobile -->
@@ -135,15 +136,16 @@
                 </a>
             </div>
 
-            <!-- Center Section: Desktop Nav Links (visible by default, hidden on mobile) -->
-            <div class="flex space-x-8 md:flex "> <!-- Changed to flex by default, hidden on mobile for md+ -->
-                <a href="#home" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">Home</a>
-                <a href="#features" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">Features</a>
-                <a href="#how-it-works" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">How It Works</a>
-                <a href="#about" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">About Us</a>
-                <a href="#faq" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">FAQ</a>
-                <a href="#news" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">Latest News</a>
-                <a href="#contact" class="text-gray-300 hover:text-blue-300 transition-colors duration-300">Contact</a>
+           <!-- Center Section: Desktop Nav Links (hidden on mobile, visible on md+) -->
+            <!-- Corrected classes: hidden on small, flex on md+ -->
+            <div id="desktop-navbar-links" class="  md:flex space-x-8">
+                <a href="#home" class="text-sm md:text-base text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300">Home</a>
+                <a href="#features" class="text-sm md:text-base text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300">Features</a>
+                <a href="#how-it-works" class="text-sm md:text-base text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300">How It Works</a>
+                <a href="#about" class="text-sm md:text-base text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300">About Us</a>
+                <a href="#faq" class="text-sm md:text-base text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300">FAQ</a>
+                <a href="#news" class="text-sm md:text-base text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300">Latest News</a>
+                <a href="#contact" class="text-sm md:text-base text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300">Contact</a>
             </div>
 
             <!-- Right Section: Theme Toggle, Login/Logout -->
@@ -156,20 +158,9 @@
                 </div>
             </div>
         </div>
-        <!-- Mobile Navigation (hidden on desktop, toggled by JS on mobile) -->
-        <div id="navbar-links" class="hidden md:hidden flex-col items-center pb-4 space-y-2 bg-black dark:bg-black transition-all duration-300 ease-in-out">
-            <a href="#home" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">Home</a>
-            <a href="#features" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">Features</a>
-            <a href="#how-it-works" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">How It Works</a>
-            <a href="#about" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">About Us</a>
-            <a href="#faq" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">FAQ</a>
-            <a href="#news" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">Latest News</a>
-            <a href="#contact" class="block w-full text-center py-2 text-gray-300 hover:bg-gray-800">Contact</a>
-        </div>
     </nav>
 
-
-    <main class="pt-20">
+    <main class="pt-10">
         <!-- Hero Section -->
         <section id="home" class="relative bg-black text-white py-24 md:py-40 text-center overflow-hidden">
             <div class="absolute inset-0 z-0"> <!-- Removed opacity-10 here -->
@@ -186,14 +177,17 @@
                     Harnessing advanced AI to detect and combat sophisticated voice impersonations.
                 </p>
                 <br>
-                <div class="space-x-4 animate-fade-in-up delay-400">
-                    <a href="#voice-analysis" id="open-voice-analysis-btn" class="px-8 py-3 bg-white border border-black text-black rounded-full text-lg font-semibold hover:bg-black hover:text-white hover:border-white transition-colors duration-300">
-                        Analyze Your Voice
-                    </a>
-                    <a href="#features" class="px-8 py-3 border border-white text-white rounded-full text-lg font-semibold hover:bg-white hover:text-black transition-colors duration-300">
-                        Learn More
-                    </a>
-                </div>
+                <br>
+                <br>
+                <div class="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4 md:justify-center animate-fade-in-up delay-400">
+                  <a href="#voice-analysis" id="open-voice-analysis-btn" class="px-8 py-3 bg-white border border-black text-black rounded-full text-lg font-semibold hover:bg-black hover:text-white hover:border-white transition-colors duration-300 text-center">
+                    Analyze Your Voice
+                  </a>
+                  <a href="#features" class="px-8 py-3 border border-white text-white rounded-full text-lg font-semibold hover:bg-white hover:text-black transition-colors duration-300 text-center">
+                     Learn More
+                  </a>
+               </div>
+
                 <br>
                 <br>
                 <br>
@@ -271,7 +265,7 @@
                         <span class="text-gray-300 dark:text-gray-300">Analyzing...</span>
                     </div>
                 </div>
-
+                
                 <!-- Analysis Results Section -->
                 <div id="analysis-results" class="mt-12 p-8 rounded-lg hidden transition-colors duration-300">
                     <h3 class="text-2xl md:text-3xl font-bold text-white mb-6">
@@ -283,8 +277,13 @@
                             <p id="confidence-score" class="text-lg text-gray-300"></p>
                             <p id="analysis-message" class="text-md text-gray-400 mt-4"></p>
                         </div>
-                        <div>
-                            <canvas id="spoofingChart" class="max-w-full h-auto"></canvas>
+                        <!-- Locate this section in your app.html -->
+                        <div class="mt-8"> <!-- Keep margin-top for spacing, but remove other box styles -->
+                           <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-4 text-center">Voice Spoofing Confidence</h3>
+                           <!-- The inner div for sizing and centering remains -->
+                           <div class="flex justify-center items-center" style="max-width: 300px; max-height: 300px; margin: 0 auto;">
+                                   <canvas id="spoofingChart"></canvas>
+                           </div>
                         </div>
                     </div>
                 </div>
@@ -504,7 +503,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
                         <!-- Contact Info Column -->
                         <div class="text-left">
-                            <h3 class="text-2xl font-bold text-white mb-4">Contact Information</h3>
+                            <h3 class="text-2xl font-bold text-white mb-4">Connect With Us</h3>
                             <p class="text-gray-300 mb-4">
                                 Feel free to reach out to us directly via email and social media.
                             </p>
@@ -518,7 +517,7 @@
                                 </div>
                                 <div class="flex items-center">
                                     <i class="fas fa-phone-alt text-green-400 mr-3 text-xl"></i>
-                                    <span class="text-gray-300">+91 95413 50110</span>
+                                    <span class="text-gray-300">+91 95413 50110 , +91 9717374978</span>
                                 </div>
                                 <div class="flex items-start">
                                     <i class="fas fa-map-marker-alt text-purple-400 mr-3 text-xl mt-1"></i>
@@ -526,17 +525,18 @@
                                 </div>
                             </div>
                             
+                            <br>
                             <div class="flex justify-start space-x-6">
-                                <a href="https://linkedin.com" target="_blank" class="social-icon linkedin-icon" aria-label="LinkedIn">
+                                <a href="https://www.linkedin.com/in/jahanvi-gupta-0a1957268/" target="_blank" class="social-icon text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300" aria-label="LinkedIn">
                                     <i class="fab fa-linkedin-in"></i>
                                 </a>
-                                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" class="social-icon twitter-icon" aria-label="Twitter">
+                                <a href="https://x.com/JahanviGupta18?t=7qgeJ_xQrpWtEhln3WPOPw&s=08 " target="_blank" rel="noopener noreferrer" class="social-icon text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300" aria-label="Twitter">
                                     <i class="fab fa-twitter"></i>
                                 </a>
-                                <a href="https://github.com/a2305223347/AI-Voice-Spoofing-Detection.git" target="_blank" class="social-icon github-icon" aria-label="GitHub">
+                                <a href="https://github.com/a2305223347/AI-Voice-Spoofing-Detection.git" target="_blank" class="social-icon text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300" aria-label="GitHub">
                                     <i class="fab fa-github"></i>
                                 </a>
-                                <a href="https://wa.me/919541350110" target="_blank" rel="noopener noreferrer" class="social-icon whatsapp-icon" aria-label="WhatsApp">
+                                <a href="https://wa.me/919541350110" target="_blank" rel="noopener noreferrer" class="social-icon text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-300" aria-label="WhatsApp">
                                     <i class="fab fa-whatsapp"></i>
                                 </a>
                             </div>
@@ -583,23 +583,19 @@
     </div>
 
     <!-- Floating Social Media Icons -->
-    <div class="fixed top-1/2 -translate-y-1/2 right-6 flex flex-col space-y-3 z-50">
-        <a href="https://wa.me/919541350110" target="_blank" rel="noopener noreferrer" class="bg-green-500 text-white p-3 rounded-md shadow-lg hover:bg-green-600 transition-colors duration-300" aria-label="WhatsApp">
-            <i class="fab fa-whatsapp text-2xl"></i>
-        </a>
-        <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" class="bg-blue-700 text-white p-3 rounded-md shadow-lg hover:bg-blue-800 transition-colors duration-300" aria-label="LinkedIn">
-            <i class="fab fa-linkedin-in text-2xl"></i>
-        </a>
-        <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" class="bg-blue-400 text-white p-3 rounded-md shadow-lg hover:bg-blue-500 transition-colors duration-300" aria-label="Twitter">
-            <i class="fab fa-twitter text-2xl"></i>
-        </a>
+    <!-- On smaller screens, position at bottom-6. On medium screens and up, revert to top-1/2 and translate-y-1/2 -->
+    <div class="fixed bottom-6 right-6 flex flex-col space-y-3 z-50" >
+     <a href="https://wa.me/919541350110" target="_blank" rel="noopener noreferrer" class="bg-green-500 text-white p-3 rounded-md shadow-lg hover:bg-green-600 transition-colors duration-300" aria-label="WhatsApp">
+        <i class="fab fa-whatsapp text-2xl"></i>
+     </a>
+     <a href="https://www.linkedin.com/in/jahanvi-gupta-0a1957268/" target="_blank" rel="noopener noreferrer" class="bg-blue-700 text-white p-3 rounded-md shadow-lg hover:bg-blue-800 transition-colors duration-300" aria-label="LinkedIn">
+        <i class="fab fa-linkedin-in text-2xl"></i>
+     </a>
+     <a href="https://x.com/JahanviGupta18?t=7qgeJ_xQrpWtEhln3WPOPw&s=08 " target="_blank" rel="noopener noreferrer" class="bg-blue-400 text-white p-3 rounded-md shadow-lg hover:bg-blue-500 transition-colors duration-300" aria-label="Twitter">
+        <i class="fab fa-twitter text-2xl"></i>
+     </a>
     </div>
-
-    <!-- News Toggle Button -->
-    <button id="news-toggle-btn" class="fixed bottom-6 right-6 bg-blue-400 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300">
-        <i class="fas fa-newspaper text-2xl"></i>
-    </button>
-
+    
     <script src="/static/script.js"></script>
     <!-- Twitter Widgets Script (removed if not needed for news) -->
 </body>
