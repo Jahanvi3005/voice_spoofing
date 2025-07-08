@@ -8,8 +8,8 @@
         envVars:
           - key: FLASK_SECRET_KEY
             generateValue: true # Render will generate a strong secret key for you
-          - key: MONGO_URI
-            value: mongodb+srv://jahanvi:<9541350110>@cluster0.gpegtup.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0# Replace with your actual MongoDB URI
+          - key: MONGO_UR
+            value: mongodb+srv://jahanvi:<9541350110>@cluster0.gpegtup.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
           - key: NEWS_API_KEY
             value: 4004719a0aa54f07868c82c0aabc8e88 # Replace with your actual NewsAPI.org key
           # Add any other environment variables your app needs
