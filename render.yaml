@@ -7,8 +7,8 @@
         startCommand: python app.py --bind 0.0.0.0:$PORT
         envVars:
           - key: FLASK_SECRET_KEY
-            generateValue: true # Render will generate a strong secret key for you
-          - key: MONGO_UR
+            value: ab1c0e1616bd5e0faa226841ed684e2034fbf45924ff557a
+          - key: MONGO_URI
             value: mongodb+srv://jahanvi:<9541350110>@cluster0.gpegtup.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
           - key: NEWS_API_KEY
             value: 4004719a0aa54f07868c82c0aabc8e88 # Replace with your actual NewsAPI.org key
